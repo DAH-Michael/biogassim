@@ -21,6 +21,9 @@ export const ICONS = {
   up: icon('<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'),
   down: icon('<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>'),
   flat: icon('<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>'),
+  plus: icon('<path d="M12 5v14M5 12h14"/>'),
+  minus: icon('<path d="M5 12h14"/>'),
+  fit: icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   message: icon('<path d="M4 5h16v11H8l-4 4z"/>'),
 };
 export type IconName = keyof typeof ICONS;

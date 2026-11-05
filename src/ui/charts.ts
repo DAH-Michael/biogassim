@@ -18,7 +18,9 @@ const PAD_R = 16;
 const CHART_H = 112;
 const PAD_T = 12;
 const PAD_B = 22;
-const STRIP_H = 40;
+const STRIP_LANE = 16;
+const STRIP_LANES = 4;
+const MARKER_GAP = 13;
 
 function el<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}): SVGElementTagNameMap[K] {
   const e = document.createElementNS(NS, tag);
@@ -113,15 +115,26 @@ export function buildTimeline(s: GameState): HTMLElement {
   };
 
   // Ereignisleiste
-  const strip = el('svg', { viewBox: `0 0 ${W} ${STRIP_H}`, class: 'timeline__strip', role: 'list', 'aria-label': 'Ereignisse und Entscheidungen' });
-  strip.append(el('line', { x1: PAD_L, x2: W - PAD_R, y1: STRIP_H / 2, y2: STRIP_H / 2, class: 'axis' }));
-  const label = el('text', { x: 0, y: STRIP_H / 2 + 4, class: 'chart__axis-label' });
+  // Marken auf Spuren verteilen, damit dicht liegende Ereignisse sich nicht überdecken
+  const items = timelineEvents(s);
+  const laneEnd: number[] = [];
+  const placed = items.map((it) => {
+    const x = xOf(Math.min(it.ev.day, days - 1), days);
+    let lane = laneEnd.findIndex((end) => x - end >= MARKER_GAP);
+    if (lane < 0) lane = laneEnd.length < STRIP_LANES ? laneEnd.length : laneEnd.indexOf(Math.min(...laneEnd));
+    laneEnd[lane] = x;
+    return { ...it, x, lane };
+  });
+  const lanes = Math.max(1, Math.min(STRIP_LANES, laneEnd.length));
+  const stripH = lanes * STRIP_LANE + 8;
+  const strip = el('svg', { viewBox: `0 0 ${W} ${stripH}`, class: 'timeline__strip', role: 'list', 'aria-label': 'Ereignisse und Entscheidungen' });
+  for (let l = 0; l < lanes; l++) strip.append(el('line', { x1: PAD_L, x2: W - PAD_R, y1: 4 + STRIP_LANE * (l + 0.5), y2: 4 + STRIP_LANE * (l + 0.5), class: 'grid' }));
+  const label = el('text', { x: 0, y: stripH / 2 + 4, class: 'chart__axis-label' });
   label.textContent = 'Ereignisse';
   strip.append(label);
-  for (const { ev, kind, chain } of timelineEvents(s)) {
-    const x = xOf(Math.min(ev.day, days - 1), days);
-    const y = STRIP_H / 2;
-    const r = chain ? 7 : 5;
+  for (const { ev, kind, chain, x, lane } of placed) {
+    const y = 4 + STRIP_LANE * (lane + 0.5);
+    const r = chain ? 6 : 4.5;
     let shape: SVGElement;
     if (kind === 'decision') shape = el('circle', { cx: x, cy: y, r });
     else if (kind === 'warning') shape = el('path', { d: `M${x},${y - r - 1} L${x + r + 1},${y + r} L${x - r - 1},${y + r} Z` });

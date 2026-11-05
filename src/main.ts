@@ -14,6 +14,8 @@ import { h } from './ui/dom';
 import { newUnlocks, codeForKeys } from './meta/progression';
 import { UNLOCKS } from './meta/unlocks.config';
 import type { Action, GameState, ScenarioOptions } from './sim/types';
+import { DebugPanel } from './ui/debug';
+import { UNLOCK_KEYS } from './sim/unlockKeys';
 
 /**
  * Einstieg: Startmenü, Durchläufe, Metaprogression. Fortschritt wird ausschließlich
@@ -24,7 +26,8 @@ import type { Action, GameState, ScenarioOptions } from './sim/types';
  */
 const params = new URLSearchParams(location.search);
 const demo = params.get('demo');
-const plan: (s: GameState) => Action[] = demo && STRATEGIES[demo] ? STRATEGIES[demo].strategy : () => [];
+let strategyName = demo && STRATEGIES[demo] ? demo : '';
+let plan: (s: GameState) => Action[] = strategyName ? STRATEGIES[strategyName].strategy : () => [];
 const debug = params.has('debug');
 const maxSpeed = debug ? CONFIG.time.debugMaxSpeed : Math.max(...CONFIG.time.speeds);
 const testStart = ['seed', 'demo', 'tag', 'szenario', 'waerme'].some((k) => params.has(k));
@@ -103,13 +106,52 @@ const app = new App(root, game, (c) => new Scene(c, paletteFromDocument()), () =
 app.endExtra = endExtra;
 if (!testStart) showMenu();
 
-// Debug: Lesezugriff auf den Spielstand für automatische Prüfungen (nur mit ?debug)
-if (debug) (window as unknown as { biogas: unknown }).biogas = { get state() { return game.state; }, get unlocks() { return unlocks; }, setSpeed: (v: number) => game.setSpeed(v) };
+// Debug-Modus: Panel (Taste D) und Lesezugriff für automatische Prüfungen
+let debugPanel: DebugPanel | null = null;
+if (debug) {
+  (window as unknown as { biogas: unknown }).biogas = { get state() { return game.state; }, get unlocks() { return unlocks; }, setSpeed: (v: number) => game.setSpeed(v) };
+  debugPanel = new DebugPanel({
+    getState: () => game.state,
+    getSpeed: () => game.speed,
+    setSpeed: (v) => game.setSpeed(v),
+    strategy: () => strategyName,
+    getUnlocks: () => unlocks,
+    unlockAll: () => { unlocks = [...UNLOCK_KEYS]; },
+    resetUnlocks: () => { unlocks = []; },
+    jumpTo: (target) => {
+      const cur = game.state;
+      if (target >= cur.day) {
+        while (game.state.day < target && !game.over) stepDay(game.state, plan(game.state));
+        app.refresh();
+        return;
+      }
+      // Zurück: gleicher Seed, alle bisherigen Entscheidungen bis zum Zieltag erneut anwenden
+      const st = createGame(cur.seed, cur.scenario, cur.unlocks);
+      const byDay = new Map<number, Action[]>();
+      for (const x of cur.actionLog) byDay.set(x.day, [...(byDay.get(x.day) ?? []), x.action]);
+      while (st.day < Math.max(1, target) && !st.failure) stepDay(st, byDay.get(st.day) ?? []);
+      game = new GameController(st, plan, maxSpeed);
+      game.speed = 0;
+      app.attach(game);
+    },
+    restart: (seed, strat) => {
+      strategyName = strat && STRATEGIES[strat] ? strat : '';
+      plan = strategyName ? STRATEGIES[strategyName].strategy : () => [];
+      lastScenario = game.state.scenario;
+      game = newController(seed || newSeed(), lastScenario, 0, 1);
+      app.attach(game);
+    },
+  });
+  document.body.append(debugPanel.el);
+  debugPanel.toggle(true);
+}
 
 // Adaptive Qualität: dauerhaft langsame Bilder senken die Pixeldichte
 const SLOW_FRAME_S = 1 / 30;
 const SLOW_FRAMES_LIMIT = 90;
 let slowFrames = 0;
+let debugFrame = 0;
+const DEBUG_EVERY = 15;
 let last = performance.now();
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function frame(now: number) {
@@ -122,6 +164,7 @@ function frame(now: number) {
   }
   const f = game.advance(dt);
   app.frame(dt, f, reduced ? 0 : now / 1000);
+  if (debugPanel && (debugFrame = (debugFrame + 1) % DEBUG_EVERY) === 0) debugPanel.update();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

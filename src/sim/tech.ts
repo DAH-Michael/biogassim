@@ -83,8 +83,12 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
   const capCh4 = chpCh4PerDay();
   const minStore = gas.capacityM3 * PL.gasStorageMinShare;
   if (chp.status === 'betrieb') {
+    // Speichermanagement: das BHKW verwertet die Tagesproduktion und führt den Speicher
+    // langsam zum Zielfüllstand zurück, damit Reserven für Stillstände bleiben
     const availableBiogas = Math.max(0, gas.storedM3 - minStore);
-    const useBiogas = Math.min(availableBiogas, capCh4 / share);
+    const target = gas.capacityM3 * PL.gasStorageTargetShare;
+    const wanted = Math.max(0, biogas + (gas.storedM3 - biogas - target) * PL.gasStorageRelax);
+    const useBiogas = Math.min(availableBiogas, capCh4 / share, wanted);
     ch4Used = useBiogas * share;
     gas.storedM3 -= useBiogas;
   }

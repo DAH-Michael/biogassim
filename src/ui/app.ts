@@ -36,6 +36,9 @@ const HITS: Hit[] = [
 ];
 /** Höhen, auf denen ein Klick getestet wird (für hohe Objekte). */
 const HIT_HEIGHTS = [3, 2, 1, 0];
+const ZOOM_STEP = 1.15;
+/** Bewegung in Pixeln, ab der aus einem Tippen ein Verschieben wird */
+const DRAG_THRESHOLD = 6;
 
 export class App {
   private game: GameController;
@@ -106,9 +109,16 @@ export class App {
       this.scene.resize(r.width, r.height);
     }).observe(stage);
 
-    this.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
+    this.setupZoom(stage);
+    this.canvas.addEventListener('click', (e) => {
+      if (this.dragged) return;
+      this.onCanvasClick(e);
+    });
     this.canvas.addEventListener('mousemove', (e) => {
-      this.canvas.style.cursor = this.hitAt(e) ? 'pointer' : 'default';
+      if (this.pointers.size) return;
+      const hit = this.hitAt(e);
+      this.canvas.style.cursor = hit ? 'pointer' : this.scene.zoomLevel > 1 ? 'grab' : 'default';
+      this.canvas.title = hit ? hit.label : '';
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
 
@@ -116,11 +126,19 @@ export class App {
   }
 
   /** Neuen Durchlauf anhängen (Neustart). */
+  private attached = new WeakSet<GameController>();
+
   attach(game: GameController): void {
     this.game = game;
     this.hideOverlay();
     this.ticker.clear(0);
+    if (this.attached.has(game)) {
+      this.refresh();
+      return;
+    }
+    this.attached.add(game);
     game.on((s, reason) => {
+      if (game !== this.game) return;
       if (reason !== 'speed') {
         this.scene.update(s);
         this.metrics.update(s);
@@ -137,6 +155,19 @@ export class App {
     this.updateTime();
     this.refreshPanel();
     if (game.over) this.showEnd(game.state);
+  }
+
+  /** Alles neu zeichnen, z. B. nach einem Sprung im Debug-Modus. */
+  refresh(): void {
+    const s = this.game.state;
+    this.ticker.clear(s.messages.length);
+    this.scene.update(s);
+    this.metrics.update(s);
+    this.updateCalendar(s);
+    this.updateTime();
+    this.refreshPanel();
+    if (this.game.over) this.showEnd(s);
+    else this.hideOverlay();
   }
 
   frame(dt: number, f: number, t: number): void {
@@ -201,6 +232,69 @@ export class App {
     else if (focusFirst) (this.drawerBody.querySelector('input, select, button') as HTMLElement | null)?.focus({ preventScroll: true });
   }
 
+  // ---------- Zoom und Verschieben ----------
+
+  private pointers = new Map<number, { x: number; y: number }>();
+  private dragged = false;
+  private pinchDist = 0;
+
+  private setupZoom(stage: HTMLElement): void {
+    const c = this.canvas;
+    const local = (e: { clientX: number; clientY: number }) => {
+      const r = c.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    c.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const p = local(e);
+      this.scene.zoomBy(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, p.x, p.y);
+    }, { passive: false });
+    c.addEventListener('pointerdown', (e) => {
+      this.pointers.set(e.pointerId, local(e));
+      this.dragged = false;
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      }
+      c.setPointerCapture(e.pointerId);
+    });
+    c.addEventListener('pointermove', (e) => {
+      const prev = this.pointers.get(e.pointerId);
+      if (!prev) return;
+      const p = local(e);
+      if (this.pointers.size === 1) {
+        const dx = p.x - prev.x;
+        const dy = p.y - prev.y;
+        if (this.dragged || Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+          if (this.scene.zoomLevel > 1) this.scene.panBy(dx, dy);
+          this.dragged = true;
+          this.pointers.set(e.pointerId, p);
+        }
+      } else if (this.pointers.size === 2) {
+        this.pointers.set(e.pointerId, p);
+        const [a, b] = [...this.pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (this.pinchDist > 0) this.scene.zoomBy(dist / this.pinchDist, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        this.pinchDist = dist;
+        this.dragged = true;
+      }
+    });
+    const end = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      if (this.pointers.size < 2) this.pinchDist = 0;
+    };
+    c.addEventListener('pointerup', end);
+    c.addEventListener('pointercancel', end);
+
+    const btn = (label: string, icon: string, fn: () => void) =>
+      h('button', { type: 'button', class: 'zoom__btn', 'aria-label': label, title: label, onclick: fn }, svg(icon));
+    stage.append(h('div', { class: 'zoom', role: 'group', 'aria-label': 'Ansicht' },
+      btn('Heranzoomen (+)', ICONS.plus, () => this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP)),
+      btn('Herauszoomen (−)', ICONS.minus, () => this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP))),
+      btn('Ganze Anlage zeigen', ICONS.fit, () => this.scene.resetZoom()),
+    ));
+  }
+
   // ---------- Szene antippen ----------
 
   private hitAt(e: MouseEvent): Hit | null {
@@ -240,6 +334,8 @@ export class App {
       e.preventDefault();
       return;
     }
+    if (e.key === '+') this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP);
+    if (e.key === '-') this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP));
     if (e.key === '1') this.game.setSpeed(1);
     if (e.key === '2') this.game.setSpeed(2);
     if (e.key === '0') this.game.setSpeed(0);

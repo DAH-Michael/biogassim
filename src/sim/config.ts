@@ -72,6 +72,9 @@ export const CONFIG = {
     gasStorageM3: 2000,
     /** Füllung Gasspeicher beim Start, Anteil */
     gasStartShare: 0.5,
+    /** Zielfüllstand des Gasspeichers und Anteil der Abweichung, der pro Tag ausgeglichen wird. Richtwert, fachlich prüfen */
+    gasStorageTargetShare: 0.5,
+    gasStorageRelax: 0.5,
     /** Mindestfüllung Gasspeicher, unter der das BHKW nicht startet, Anteil. Richtwert, fachlich prüfen */
     gasStorageMinShare: 0.05,
     /** Fahrsilo Kapazität, t FM. Richtwert, fachlich prüfen */

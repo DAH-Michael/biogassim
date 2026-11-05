@@ -2,7 +2,7 @@
 
 A small sim game to promote biogas.
 
-Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 5, Metaprogression und Startmenü** (Feinschliff und Debug-Panel folgen in Meilenstein 6).
+Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 6, Feinschliff** (Balancing-Durchgang folgt in Meilenstein 7).
 
 ## Befehle
 
@@ -24,6 +24,8 @@ Bedienung: Leiste links mit den Entscheidungsbereichen, Kennwertleiste rechts, M
 | Leertaste, 0, 1, 2 | Pause, normal, doppelt |
 | F, B, A, T, P, G, U, K | Fütterung, Beschaffung, Felder (Acker), Technik, Personal, Gärrest, Ausbau und Dorf, Finanzen (Konto) |
 | Esc | Bereich schließen |
+| +, − | Szene zoomen (auch Mausrad, zwei Finger; Ziehen verschiebt) |
+| D | Debug-Panel ein- und ausblenden (nur mit `?debug`) |
 
 Fortschritt: Freischaltungen gelten für die laufende Sitzung. Am Ende jedes Durchlaufs erscheint ein Speichercode (12 Zeichen in Vierergruppen, mit Kopierknopf), der im Startmenü wieder eingegeben werden kann. Im Browser wird nichts gespeichert.
 
@@ -37,7 +39,7 @@ URL-Parameter für Abnahme und Balancing (sie überspringen das Startmenü, auß
 | `?szenario=eigene_felder` | Startszenario mit eigenen Feldern |
 | `?waerme` | Wärmeleitung ab Start |
 | `?speed=2`, mit `?debug` bis 50 | Geschwindigkeit |
-| `?debug` | höhere Geschwindigkeiten, Lesezugriff `window.biogas.state` (Debug-Panel folgt in Meilenstein 6) |
+| `?debug` | Debug-Panel: alle internen Werte, Zeitraffer bis 50x, Sprung zu Datum (auch zurück, durch Wiederholung der Entscheidungen), Seed und Testspieler, alle Freischaltungen; Lesezugriff `window.biogas.state` |
 
 Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_aufschieben`, `kein_personal`, `dauerfackel`, `ueberfuettern` (siehe `src/sim/strategies/index.ts`).
 
@@ -57,6 +59,7 @@ Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_a
 | `src/ui/` | Oberfläche: Spielsteuerung, Kennwertleiste, Entscheidungsbereiche, Meldungen |
 | `src/content/messages.de.ts` | Texte der Meldungen aus der Welt |
 | `src/content/analysis.de.ts` | Satz der ersten Ebene und Hintergrundtexte der Analyse |
+| `src/ui/debug.ts` | Debug-Panel für das Balancing |
 | `src/ui/menu.ts`, `src/ui/savecodeView.ts` | Startmenü mit Szenarien, Freischaltungen und Codeeingabe; Codeanzeige mit Kopieren |
 | `src/ui/analysis.ts`, `src/ui/charts.ts` | Analyse in drei Ebenen, Verläufe mit Ereignisleiste und Tabellenansicht |
 | `tools/simulate.ts` | Konsolenwerkzeug |

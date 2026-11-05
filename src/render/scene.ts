@@ -78,10 +78,60 @@ export class Scene {
     const zoom = 1.18;
     const cx = cssWidth / 2;
     const cy = cssHeight / 2;
-    this.view = { scale: fit.scale * zoom, ox: cx + (fit.ox - cx) * zoom, oy: cy + (fit.oy - cy) * zoom };
+    this.baseView = { scale: fit.scale * zoom, ox: cx + (fit.ox - cx) * zoom, oy: cy + (fit.oy - cy) * zoom };
+    this.applyZoom();
     this.bg.width = this.canvas.width;
     this.bg.height = this.canvas.height;
     this.bgDirty = true;
+  }
+
+  private baseView: View = { scale: 1, ox: 0, oy: 0 };
+  private zoom = 1;
+  private panX = 0;
+  private panY = 0;
+  static readonly MAX_ZOOM = 3;
+
+  private applyZoom(): void {
+    const b = this.baseView;
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    // Verschiebung begrenzen, damit die Anlage nicht aus dem Bild rutscht
+    const limX = (this.width * (this.zoom - 1)) / 2;
+    const limY = (this.height * (this.zoom - 1)) / 2;
+    this.panX = Math.max(-limX, Math.min(limX, this.panX));
+    this.panY = Math.max(-limY, Math.min(limY, this.panY));
+    this.view = { scale: b.scale * this.zoom, ox: cx + (b.ox - cx) * this.zoom + this.panX, oy: cy + (b.oy - cy) * this.zoom + this.panY };
+    this.bgDirty = true;
+  }
+
+  /** Zoomen um einen Bildschirmpunkt (Standard: Mitte). */
+  zoomBy(factor: number, sx = this.width / 2, sy = this.height / 2): void {
+    const z = Math.max(1, Math.min(Scene.MAX_ZOOM, this.zoom * factor));
+    const k = z / this.zoom;
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    // Punkt unter dem Zeiger bleibt an seinem Platz
+    this.panX = (this.panX - (sx - cx)) * k + (sx - cx);
+    this.panY = (this.panY - (sy - cy)) * k + (sy - cy);
+    this.zoom = z;
+    this.applyZoom();
+  }
+
+  panBy(dx: number, dy: number): void {
+    this.panX += dx;
+    this.panY += dy;
+    this.applyZoom();
+  }
+
+  resetZoom(): void {
+    this.zoom = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this.applyZoom();
+  }
+
+  get zoomLevel(): number {
+    return this.zoom;
   }
 
   /** Senkt die Pixeldichte (adaptive Qualität). Gibt true zurück, wenn sich etwas geändert hat. */
