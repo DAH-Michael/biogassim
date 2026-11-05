@@ -69,6 +69,7 @@ export class App {
   private endOverlay: HTMLElement;
   private canvas: HTMLCanvasElement;
   private advisor: Advisor;
+  private stage!: HTMLElement;
 
   constructor(root: HTMLElement, game: GameController, private makeScene: (c: HTMLCanvasElement) => Scene, private restart: () => void, private toMenu: () => void = () => undefined) {
     this.game = game;
@@ -123,7 +124,10 @@ export class App {
       setSpeed: (v) => this.game.setSpeed(v),
       openPanel: (id) => this.open(id),
     });
-    const stage = h('main', { class: 'stage' }, this.canvas, this.drawer, this.ticker.el, this.advisor.el, this.endOverlay);
+    // Großes Pausesymbol über der entsättigten Szene; Klicks gehen hindurch
+    const pauseMark = h('div', { class: 'pause-mark', 'aria-hidden': 'true' }, svg('<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="58" class="pause-mark__disc"/><rect x="38" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/><rect x="67" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/></svg>'));
+    const stage = h('main', { class: 'stage' }, this.canvas, pauseMark, this.drawer, this.ticker.el, this.advisor.el, this.endOverlay);
+    this.stage = stage;
     // Absender unten rechts im Weißraum der Kennwertleiste
     this.metrics.el.append(h('a', { class: 'powered', href: 'https://www.dah-gruppe.de', target: '_blank', rel: 'noopener', 'data-tip': 'Zur Website der DAH Gruppe (öffnet in neuem Fenster).' },
       h('span', { class: 'powered__label' }, 'powered by'),
@@ -227,6 +231,14 @@ export class App {
 
   private updateTime(): void {
     for (const b of this.timeButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === this.game.speed));
+    this.updatePause();
+  }
+
+  /** Pause deutlich zeigen: nur im laufenden Spiel, nicht unter Startmenü oder Analyse. */
+  private updatePause(): void {
+    if (!this.stage) return;
+    const paused = this.game.speed === 0 && !this.game.over && this.endOverlay.hidden;
+    this.stage.classList.toggle('is-paused', paused);
   }
 
   // ---------- Entscheidungsbereiche ----------
@@ -416,11 +428,13 @@ export class App {
     // Leiste und Zeitsteuerung sind hinter Startmenü und Analyse nicht bedienbar
     this.setBackgroundInert(true);
     (this.endOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus();
+    this.updatePause();
   }
 
   hideOverlay(): void {
     this.endOverlay.hidden = true;
     this.setBackgroundInert(false);
+    this.updatePause();
   }
 
   private setBackgroundInert(on: boolean): void {

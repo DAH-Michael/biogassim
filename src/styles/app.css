@@ -93,6 +93,15 @@ svg { display: block; flex: none; }
 .zoom__btn { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: var(--radius-button); background: var(--white); color: var(--dunkelgruen); cursor: pointer; box-shadow: var(--shadow-sm); }
 .zoom__btn:hover { background: var(--cream); }
 
+/* Pause: entsättigte Szene und großes, halbtransparentes Symbol */
+#scene { transition: filter .3s ease; }
+.stage.is-paused #scene { filter: grayscale(0.8) brightness(1.04); }
+.pause-mark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity .3s ease; z-index: 1; }
+.pause-mark svg { width: clamp(110px, 20vmin, 190px); height: auto; filter: drop-shadow(0 6px 20px rgba(8, 40, 24, 0.3)); }
+.pause-mark__disc { fill: var(--glass-dark); }
+.pause-mark__bar { fill: var(--white); opacity: 0.9; }
+.stage.is-paused .pause-mark { opacity: 0.8; }
+
 /* Ausklappbarer Entscheidungsbereich */
 .drawer {
   position: absolute;
