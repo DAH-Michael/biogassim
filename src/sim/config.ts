@@ -62,8 +62,15 @@ export const CONFIG = {
     chpEtaTh: 0.43,
     /** kWh Heizwert pro m³ Methan. Richtwert, fachlich prüfen */
     methaneKwhPerM3: 10,
-    /** Eigenstrombedarf der Anlage als Anteil der Erzeugung. Richtwert, fachlich prüfen */
-    ownPowerShare: 0.07,
+    /**
+     * Eigenstrombedarf: Grundlast (Rührwerke, Pumpen, Steuerung, Gaskühlung laufen auch ohne
+     * Gas weiter) plus ein Anteil der Erzeugung. Bei Volllast zusammen etwa 7 %.
+     * Richtwert, fachlich prüfen
+     */
+    ownPowerBaseKw: 15,
+    ownPowerShare: 0.04,
+    /** Bezugspreis für Netzstrom, wenn die eigene Erzeugung den Eigenbedarf nicht deckt, €/kWh. Richtwert, fachlich prüfen */
+    gridPurchaseEurPerKwh: 0.25,
     /** Arbeitsvolumen Hauptfermenter, m³. Richtwert, fachlich prüfen */
     fermenterVolumeM3: 3600,
     /** Arbeitsvolumen Nachgärer, m³. Richtwert, fachlich prüfen */

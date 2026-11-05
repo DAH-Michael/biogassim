@@ -327,7 +327,7 @@ const LEDGER_NAMES: Record<string, string> = {
   erloesStrom: 'Strom', erloesWaerme: 'Wärme', erloesVermarktung: 'Vermarktung', silageSold: 'Silage abgegeben',
   substrat: 'Substrat', transport: 'Transport', gaerrest: 'Gärrest', personal: 'Personal', fixkosten: 'Betrieb und Versicherung',
   wartung: 'Wartung', reparatur: 'Reparaturen', ausbau: 'Ausbau', pacht: 'Pacht', anbau: 'Anbau', labor: 'Labor', betrieb: 'Sonstiges',
-  zinsen: 'Zinsen', ersatzBhkw: 'Ersatz-BHKW',
+  zinsen: 'Zinsen', netzstrom: 'Netzstrom (Eigenbedarf)', ersatzBhkw: 'Ersatz-BHKW',
 };
 const INCOME = new Set(['erloesStrom', 'erloesWaerme', 'erloesVermarktung', 'silageSold']);
 
@@ -336,7 +336,7 @@ function financePanel(ctx: PanelCtx): HTMLElement {
   const L = s.finance.ledger;
   const income = Object.entries(L).filter(([k]) => INCOME.has(k));
   const costs = Object.entries(L).filter(([k]) => !INCOME.has(k) && LEDGER_NAMES[k]).sort((a, b) => b[1] - a[1]);
-  const kwh = s.totals.kwhEl * (1 - CONFIG.plant.ownPowerShare);
+  const kwh = s.totals.kwhSold;
   const totalCost = costs.reduce((a, [, v]) => a + v, 0);
   return h('div', {},
     section('Konto',

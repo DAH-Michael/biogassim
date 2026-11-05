@@ -364,6 +364,8 @@ export interface GameState {
   /** Kennzahlen fürs Jahr */
   totals: {
     kwhEl: number;
+    /** eingespeist nach Abzug des Eigenstroms */
+    kwhSold: number;
     kwhHeatSold: number;
     flaredM3: number;
     ch4LostStorageM3: number;

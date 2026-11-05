@@ -178,7 +178,7 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
     finished: false,
     origin,
     log,
-    totals: { kwhEl: 0, kwhHeatSold: 0, flaredM3: 0, ch4LostStorageM3: 0, ch4ProducedM3: 0, bioErrorDays: 0, trafficTrips: 0 },
+    totals: { kwhEl: 0, kwhSold: 0, kwhHeatSold: 0, flaredM3: 0, ch4LostStorageM3: 0, ch4ProducedM3: 0, bioErrorDays: 0, trafficTrips: 0 },
     contaminationEvent: undefined,
     lastFed: { ...feedStart },
     supplyEvents: {},
