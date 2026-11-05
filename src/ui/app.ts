@@ -4,13 +4,15 @@ import { buildAnalysis } from './analysis';
 import type { GameState } from '../sim/types';
 import { Scene, type HoverShape } from '../render/scene';
 import { unproject } from '../render/iso';
-import { FIELDS, PLANT, VILLAGE } from '../render/layout';
+import { FIELDS, NEIGHBOR_FIELDS, PLANT, VILLAGE } from '../render/layout';
 import { GameController } from './game';
 import { MetricsBar } from './metrics';
 import { PANELS, panelIcon, type PanelDef } from './panels';
 import { Ticker } from './ticker';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
+import { Advisor } from './advisor';
+import logoUrl from '../assets/logos/dah-logo-horizontal-farbig.svg?url';
 import { TIPS } from '../content/tooltips.de';
 
 /**
@@ -39,6 +41,9 @@ const HITS: Hit[] = [
   circle('tech', 'Notfackel, öffnet Technik', P.flare.x, P.flare.y, 0.5, P.flare.h, 0.4),
   circle('dig', 'Gärrestlager, öffnet Gärrest', P.storage.cx, P.storage.cy, P.storage.r, P.storage.h),
   ...Object.entries(FIELDS).map(([, f]) => rect('fields', 'Feld, öffnet Felder', f.x, f.y, f.w, f.d, 0)),
+  // Felder der Landwirte: Mais- und Grünroggenverträge, Gärrestabnahme
+  rect('supply', 'Feld von Hof Brandt, öffnet Beschaffung', NEIGHBOR_FIELDS[0].x, NEIGHBOR_FIELDS[0].y, NEIGHBOR_FIELDS[0].w, NEIGHBOR_FIELDS[0].d, 0),
+  rect('dig', 'Feld eines Gärrestabnehmers, öffnet Gärrest', NEIGHBOR_FIELDS[1].x, NEIGHBOR_FIELDS[1].y, NEIGHBOR_FIELDS[1].w, NEIGHBOR_FIELDS[1].d, 0),
   ...VILLAGE.houses.map(([x, y]) => rect('build', 'Dorf, öffnet Ausbau und Dorf', x, y, 1.8, 1.6, 1.9)),
 ];
 /** Höhen, auf denen ein Klick getestet wird (für hohe Objekte). */
@@ -63,6 +68,7 @@ export class App {
   private timeButtons: HTMLButtonElement[] = [];
   private endOverlay: HTMLElement;
   private canvas: HTMLCanvasElement;
+  private advisor: Advisor;
 
   constructor(root: HTMLElement, game: GameController, private makeScene: (c: HTMLCanvasElement) => Scene, private restart: () => void, private toMenu: () => void = () => undefined) {
     this.game = game;
@@ -112,7 +118,16 @@ export class App {
 
     this.canvas = h('canvas', { id: 'scene', 'aria-label': 'Ansicht der Biogasanlage mit Feldern und Dorf. Objekte lassen sich antippen.' }) as HTMLCanvasElement;
     this.endOverlay = h('div', { class: 'end', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'end-title' });
-    const stage = h('main', { class: 'stage' }, this.canvas, this.drawer, this.ticker.el, this.endOverlay);
+    this.advisor = new Advisor({
+      getSpeed: () => this.game.speed,
+      setSpeed: (v) => this.game.setSpeed(v),
+      openPanel: (id) => this.open(id),
+    });
+    const stage = h('main', { class: 'stage' }, this.canvas, this.drawer, this.ticker.el, this.advisor.el, this.endOverlay);
+    // Absender unten rechts im Weißraum der Kennwertleiste
+    this.metrics.el.append(h('a', { class: 'powered', href: 'https://www.dah-gruppe.de', target: '_blank', rel: 'noopener', 'data-tip': 'Zur Website der DAH Gruppe (öffnet in neuem Fenster).' },
+      h('span', { class: 'powered__label' }, 'powered by'),
+      h('img', { src: logoUrl, alt: 'DAH Gruppe', class: 'powered__logo', width: 140, height: 48 })));
     root.replaceChildren(header, h('div', { class: 'body' }, this.rail, stage, this.metrics.el));
 
     this.scene = makeScene(this.canvas);
@@ -150,8 +165,13 @@ export class App {
       return;
     }
     this.attached.add(game);
+    this.advisor.reset(!!game.state.scenario.tutorial);
     game.on((s, reason) => {
       if (game !== this.game) return;
+      if (reason !== 'speed') {
+        this.advisor.currentDay = s.day;
+        this.advisor.check(s);
+      }
       if (reason !== 'speed') {
         this.scene.update(s);
         this.metrics.update(s);
@@ -169,6 +189,7 @@ export class App {
     this.updateTime();
     this.refreshPanel();
     if (game.over) this.showEnd(game.state);
+    else this.advisor.check(game.state);
   }
 
   /** Alles neu zeichnen, z. B. nach einem Sprung im Debug-Modus. */
@@ -333,8 +354,10 @@ export class App {
     const v = this.scene.currentView;
     for (const z of HIT_HEIGHTS) {
       const [x, y] = unproject(v, sx, sy + z * v.scale);
-      const hit = HITS.find((hh) => hh.test(x, y) && this.panelAvailable(hh.panel));
-      if (hit) return hit;
+      const hit = HITS.find((hh) => hh.test(x, y));
+      if (hit && this.panelAvailable(hit.panel)) return hit;
+      // Felder ohne eigenen Bereich (Stufe Vereinfacht): dort liefern die Landwirte, also Beschaffung
+      if (hit && hit.panel === 'fields') return { ...hit, panel: 'supply', label: 'Feld eines Landwirts, öffnet Beschaffung', shape: { ...hit.shape, label: 'Feld eines Landwirts, öffnet Beschaffung' } };
     }
     return null;
   }
@@ -377,6 +400,7 @@ export class App {
 
   private showEnd(s: GameState): void {
     this.close();
+    this.advisor.reset(false);
     this.ticker.clear(s.messages.length);
     const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra: this.endExtra?.(s) ?? null });
     this.showOverlay(view);

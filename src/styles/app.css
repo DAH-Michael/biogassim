@@ -319,6 +319,35 @@ input.code__input { width: 9.5em; }
 .code__msg { min-height: 1.4em; margin: var(--space-1) 0 0; font-size: 14px; }
 .code__msg[data-state='error'] { color: var(--danger); font-weight: 600; }
 
+/* DAH-Beraterin (Tutorial) */
+.advisor { position: absolute; left: var(--space-3); bottom: var(--space-3); z-index: 2; width: min(460px, calc(100% - 2 * var(--space-3))); display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); background: var(--white); border: 2px solid var(--dunkelgruen); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.advisor[hidden] { display: none; }
+.stage:has(.drawer:not([hidden])) .advisor { left: calc(400px + 2 * var(--space-3)); width: min(420px, calc(100% - 420px - 3 * var(--space-3))); }
+.advisor__portrait { flex: none; }
+.advisor__body { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.advisor__name { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--dunkelgruen); }
+.advisor__text { margin: 0; font-size: 14px; line-height: 1.5; }
+.advisor__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* Schalter Tutorial-Modus im Startmenü */
+.switch { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-xs); cursor: pointer; }
+.switch:has(.switch__input:checked) { border: 2px solid var(--dunkelgruen); background: var(--cream); padding: calc(var(--space-3) - 1px); }
+.switch__input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch__track { position: relative; flex: none; width: 46px; height: 26px; border-radius: var(--radius-full); background: var(--k40); transition: background .2s ease; }
+.switch__track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--white); transition: transform .2s ease; }
+.switch__input:checked + .switch__track { background: var(--dunkelgruen); }
+.switch__input:checked + .switch__track::after { transform: translateX(20px); }
+.switch__input:focus-visible + .switch__track { outline: 3px solid var(--dunkelgruen); outline-offset: 2px; }
+.switch__face { flex: none; }
+.switch__body { display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.45; }
+.switch__body strong { font-family: var(--font-display); font-size: 18px; }
+
+/* powered by DAH Gruppe */
+.metrics { display: flex; flex-direction: column; }
+.powered { margin-top: auto; display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); text-decoration: none; color: var(--k80); }
+.powered__label { font-size: 11px; letter-spacing: .06em; }
+.powered__logo { width: 100%; max-width: 150px; height: auto; }
+
 /* Tooltips */
 .tip { position: fixed; z-index: 30; max-width: min(320px, calc(100vw - 16px)); padding: var(--space-2) var(--space-3); background: var(--ink-forest); color: var(--cream); border-radius: var(--radius-xs); box-shadow: var(--shadow-md); font-size: 13px; line-height: 1.45; pointer-events: none; }
 .tip[hidden] { display: none; }
@@ -351,6 +380,8 @@ input.code__input { width: 9.5em; }
   .metric__value { font-size: 17px; }
   .metric__name { font-size: 10px; }
   .metric__note { display: none; }
+  .powered { padding: var(--space-2); }
+  .advisor__portrait svg { width: 52px; height: 52px; }
   .end__card { padding: var(--space-4); }
 }
 

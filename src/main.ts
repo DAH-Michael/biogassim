@@ -83,6 +83,7 @@ function showMenu(): void {
     },
     onStart: startRun,
     difficulty: lastScenario.difficulty,
+    tutorial: lastScenario.tutorial,
   }));
 }
 

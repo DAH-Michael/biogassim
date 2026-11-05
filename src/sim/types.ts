@@ -289,6 +289,8 @@ export interface Unlocks {
 export interface ScenarioOptions {
   id: 'altanlage' | 'eigene_felder' | 'schwieriger_standort';
   difficulty?: 'vereinfacht' | 'normal' | 'real';
+  /** Tutorial-Modus mit DAH-Beraterin (nur Oberfläche, ohne Einfluss auf die Simulation) */
+  tutorial?: boolean;
   largerStorage?: boolean;
   heatLineAtStart?: boolean;
 }

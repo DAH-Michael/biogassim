@@ -4,6 +4,7 @@ import { flagsToKeys } from '../meta/unlocks.config';
 import type { ScenarioOptions } from '../sim/types';
 import { h } from './dom';
 import { TIPS } from '../content/tooltips.de';
+import { advisorPortrait } from './portrait';
 import { saveCodeView } from './savecodeView';
 import { codeForKeys } from '../meta/progression';
 
@@ -17,6 +18,7 @@ export interface MenuOptions {
   onStart: (scenario: ScenarioOptions) => void;
   /** zuletzt gewählter Schwierigkeitsgrad */
   difficulty?: ScenarioOptions['difficulty'];
+  tutorial?: boolean;
 }
 
 const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs?: string }[] = [
@@ -53,6 +55,7 @@ const REASONS: Record<string, string> = {
 export function buildMenu(o: MenuOptions): HTMLElement {
   let scenario: ScenarioOptions['id'] = 'altanlage';
   let level: NonNullable<ScenarioOptions['difficulty']> = o.difficulty ?? 'normal';
+  let tutorial = o.tutorial ?? false;
   let largerStorage = false;
   let heatLine = false;
 
@@ -75,6 +78,15 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       return h('label', { class: 'choice', for: id, 'data-tip': lv.tip }, input, h('span', { class: 'choice__body' }, h('strong', {}, lv.title), h('span', {}, lv.text)));
     }),
   );
+
+  // Tutorial-Modus: Schalter zusätzlich zur Schwierigkeit
+  const sw = h('input', { type: 'checkbox', role: 'switch', id: 'opt-tutorial', class: 'switch__input', checked: tutorial }) as HTMLInputElement;
+  sw.addEventListener('change', () => { tutorial = sw.checked; });
+  const face = h('span', { class: 'switch__face' });
+  face.innerHTML = advisorPortrait(48);
+  const tutorialSwitch = h('label', { class: 'switch', for: 'opt-tutorial', 'data-tip': 'Eine DAH-Beraterin meldet sich in wichtigen Momenten, erklärt die Lage und zeigt, wo man entscheidet. Die Zeit hält dafür kurz an.' },
+    sw, h('span', { class: 'switch__track', 'aria-hidden': 'true' }), face,
+    h('span', { class: 'switch__body' }, h('strong', {}, 'Mit DAH-Beraterin spielen'), h('span', {}, 'Tutorial-Modus: Hinweise und Erklärungen während des Spiels.')));
 
   const options: HTMLElement[] = [];
   if (has('grosses_lager')) {
@@ -122,7 +134,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
     type: 'button',
     class: 'btn btn--primary btn--large',
     'data-tip': TIPS.start,
-    onclick: () => o.onStart({ id: scenario, difficulty: level, largerStorage, heatLineAtStart: heatLine }),
+    onclick: () => o.onStart({ id: scenario, difficulty: level, tutorial, largerStorage, heatLineAtStart: heatLine }),
   }, 'Anlage übernehmen');
 
   return h('div', { class: 'menu' },
@@ -133,7 +145,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       start,
     ),
     h('section', { class: 'menu__section' }, h('h3', {}, 'Startszenario'), scenarioList, ...options),
-    h('section', { class: 'menu__section' }, h('h3', {}, 'Schwierigkeit'), levelList),
+    h('section', { class: 'menu__section' }, h('h3', {}, 'Schwierigkeit'), levelList, tutorialSwitch),
     knowledge,
     codeSection,
   );
