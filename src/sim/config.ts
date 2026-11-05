@@ -504,7 +504,9 @@ export const CONFIG = {
       maxTPerOrder: 300,
     },
     /** Agrarberaterin: Preisnachlass bei Vertragsabschluss */
-    advisorPriceDiscount: 0.05,
+    advisorPriceDiscount: 0.08,
+    /** Agrarberaterin: Silagequalität aus Lieferverträgen (berät Erntezeitpunkt und Verdichtung). Richtwert, fachlich prüfen */
+    advisorContractQuality: 0.9,
   },
 
   /** Reststoffmarkt */
@@ -537,9 +539,9 @@ export const CONFIG = {
   /** Personal. Kosten inklusive Nebenkosten, €/Monat, anteilig für diese Anlage (Teilzeit oder geteilt mit Nachbaranlagen, Annahme). Richtwert, fachlich prüfen */
   staff: {
     roles: {
-      biologin: { salaryEurPerMonth: 3000 },
+      biologin: { salaryEurPerMonth: 2500 },
       techniker: { salaryEurPerMonth: 3500 },
-      agrar: { salaryEurPerMonth: 2500 },
+      agrar: { salaryEurPerMonth: 2000 },
       vermarkter: { salaryEurPerMonth: 2500 },
     },
     /** Einarbeitung bis zur Wirkung, Tage */
@@ -547,7 +549,9 @@ export const CONFIG = {
     /** Kündigungsfrist, Monatsgehälter */
     severanceMonths: 1,
     /** Biologin: maximale Änderung der tatsächlichen Mischung pro Tag (sanfter Wechsel) */
-    biologistRampPerDay: 0.1,
+    biologistRampPerDay: 0.015,
+    /** Biologin: Mehrertrag durch bessere Prozessführung (Enzyme, Spurenelemente, Rührzeiten), Anteil. Richtwert, fachlich prüfen */
+    biologistYieldBonus: 0.04,
     /** Biologin: Spurenelementdosierung, € pro t oTS */
     traceDosingEurPerTots: 4,
     /** Techniker: Faktor auf Ausfallwahrscheinlichkeit, Verschleiß und Stillstandsdauer */
@@ -741,9 +745,11 @@ export const CONFIG = {
     /** Reichweite Silovorrat bis zur nächsten Maisernte, Tage (31. Juli bis Mitte September) */
     supplyDaysNeeded: 45,
     /** Punkte je Kennzahl, Schwellen (gut, sehr gut). Richtwert */
-    profitEur: [0, 80000] as const,
-    acceptance: [45, 65] as const,
-    gasLossShare: [0.05, 0.02] as const,
+    profitEur: [0, 60000] as const,
+    acceptance: [45, 58] as const,
+    gasLossShare: [0.05, 0.03] as const,
+    /** Restwert von Investitionen nach einem Jahr (Abschreibung über zehn Jahre). Richtwert */
+    investmentResidualShare: 0.9,
     bioErrorShare: [0.1, 0.03] as const,
     /** Stufen: Mindestpunkte. Namen in content */
     tiers: [0, 3, 6, 9] as const,

@@ -2,7 +2,7 @@
 
 A small sim game to promote biogas.
 
-Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 6, Feinschliff** (Balancing-Durchgang folgt in Meilenstein 7).
+Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 7, Balancing-Durchgang abgeschlossen.** Bericht: `docs/balancing.md`.
 
 ## Befehle
 
@@ -14,6 +14,7 @@ npm test                                              # Vitest, Simulation
 npm run sim -- --seed 42 --strategy ausgewogen        # ein Jahr headless, Kennzahlen und Kausalkette
 npm run sim -- --strategy naiv --events --messages    # mit allen Warnungen und Meldungen aus der Welt
 npm run sim -- --strategy alle --seeds 30             # Übersicht aller Strategien über viele Seeds
+npm run balance -- --seeds 50                         # Balancing-Tabelle als Markdown
 npm run sim -- --strategy ausgewogen --scenario eigene_felder
 ```
 

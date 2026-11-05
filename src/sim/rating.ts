@@ -40,7 +40,9 @@ export function yearSummary(state: GameState): YearSummary {
     .filter((f) => f.status === 'gefuehrt' && (f.standing === 'mais' || f.standing === 'zweitmais'))
     .reduce((a, f) => a + CONFIG.fields.list.find((x) => x.id === f.id)!.ha * (f.standing === 'mais' ? CONFIG.fields.yieldTPerHa.mais : CONFIG.fields.yieldTPerHa.maisNachRoggen), 0);
   const supplyDays = dailySilage > 0 ? siloStock(state) / dailySilage : Infinity;
-  const profit = state.finance.balance - CONFIG.finance.startBalanceEur;
+  // Investitionen sind kein Verlust: ihr Restwert nach einem Jahr zählt zum Ergebnis
+  const invested = (state.finance.ledger.ausbau ?? 0) + (state.finance.ledger.ersatzBhkw ?? 0);
+  const profit = state.finance.balance - CONFIG.finance.startBalanceEur + invested * CONFIG.rating.investmentResidualShare;
   const bioErrorShare = t.bioErrorDays / days;
 
   let points = 0;

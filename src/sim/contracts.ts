@@ -54,7 +54,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
     if (c.delivered >= c.tonnes || day < c.startDay || weather.wet) continue;
     const t = Math.min(c.deliveryTPerDay, c.tonnes - c.delivered);
     c.delivered += t;
-    res.deliveries.push({ kind: c.kind, t, quality: CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm, origin: c.offerId });
+    res.deliveries.push({ kind: c.kind, t, quality: hasStaff(state, 'agrar') ? K.advisorContractQuality : CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm, origin: c.offerId });
     const cost = t * (c.priceEurPerT + K.silageTransportEurPerTKm * c.distanceKm + K.silageHandlingEurPerT);
     state.finance.balance -= cost;
     ledger(state, 'substrat', t * c.priceEurPerT);

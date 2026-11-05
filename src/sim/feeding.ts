@@ -134,6 +134,9 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
     ledger(state, 'betrieb', cost);
   }
 
+  // Biologin: bessere Prozessführung bringt etwas mehr Gas aus demselben Futter
+  if (hasStaff(state, 'biologin')) for (const s of SUBSTRATES) ch4PerT[s] *= 1 + CONFIG.staff.biologistYieldBonus;
+
   for (const s of SUBSTRATES) state.inputTotals[s] += fed[s];
   state.lastFed = { ...fed };
   return { fed, ch4PerT, changeCause, residueEvent, trafficTrips: g.trafficTrips, trafficSource: g.trafficSource };

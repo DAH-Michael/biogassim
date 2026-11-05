@@ -24,6 +24,8 @@ interface Profile {
   staff?: ('biologin' | 'techniker' | 'agrar' | 'vermarkter')[];
   leaseFields?: { id: string; crop: 'gruenroggen' | 'zweikultur' | 'mais' }[];
   builds?: ('cover' | 'gasStorage' | 'digestateStorage' | 'heatLine' | 'secondSilo')[];
+  /** Ausbauten zu einem späteren Datum */
+  buildsLater?: { kind: 'cover' | 'gasStorage' | 'digestateStorage' | 'heatLine' | 'secondSilo'; date: [number, number] }[];
   /** Mais nachkaufen, wenn der Vorrat unter so viele Tage fällt */
   spotBelowDays?: number;
   /** reagiert auf hohe Messwerte mit weniger Fütterung */
@@ -51,6 +53,7 @@ function profileStrategy(p: Profile): Strategy {
         a.push({ type: 'setCrop', fieldId: f.id, crop: f.crop });
       }
     }
+    for (const b of p.buildsLater ?? []) if (d === dayOfDate(b.date)) a.push({ type: 'build', kind: b.kind });
     if (p.feedAfterRye && d === windowDays(CONFIG.fields.windows.roggenHarvest).end + 2) {
       a.push({ type: 'setFeeding', feed: p.feedAfterRye });
     }
@@ -66,8 +69,8 @@ function profileStrategy(p: Profile): Strategy {
     if (p.spread && inWindow(d, CONFIG.digestate.blackout) && s.digestate.m3 / s.digestate.capacityM3 > strategyConfig.blackoutReduceShare && s.feedTarget.guelle > strategyConfig.blackoutGuelleT) {
       a.push({ type: 'setFeeding', feed: { guelle: strategyConfig.blackoutGuelleT } });
     }
-    if (p.spread && !inWindow(d, CONFIG.digestate.blackout) && p.feed?.guelle !== undefined && s.feedTarget.guelle === strategyConfig.blackoutGuelleT && p.feed.guelle > strategyConfig.blackoutGuelleT) {
-      a.push({ type: 'setFeeding', feed: { guelle: p.feed.guelle } });
+    if (p.spread && !inWindow(d, CONFIG.digestate.blackout) && s.feedTarget.guelle === strategyConfig.blackoutGuelleT && (p.feed?.guelle ?? CONFIG.feeding.start.guelle) > strategyConfig.blackoutGuelleT) {
+      a.push({ type: 'setFeeding', feed: { guelle: p.feed?.guelle ?? CONFIG.feeding.start.guelle } });
     }
     if (p.spotBelowDays) {
       const daily = s.feedTarget.mais;
@@ -92,6 +95,18 @@ export const strategyConfig = {
   blackoutReduceShare: 0.85,
   blackoutGuelleT: 20,
 };
+
+const BALANCED: Profile = {
+  feed: { mais: 24, guelle: 40 },
+  feedAfterRye: { mais: 16, gruenroggen: 10, guelle: 40 },
+  maizeContracts: { lw_wendt: 1500, lw_brandt: 2500, lw_lindner: 3000 },
+  ryeContracts: { lw_brandt_r: 1500 },
+  maintain: true, desulf: true, spread: true, leaseFields: [{ id: 'f1', crop: 'zweikultur' }], spotBelowDays: 15, reactToFos: true,
+};
+
+function withStaff(role: NonNullable<Profile['staff']>[number]): Strategy {
+  return profileStrategy({ ...BALANCED, staff: [role] });
+}
 
 const ALL_MAIZE = Object.fromEntries(CONFIG.contracts.maizeOffers.map((o) => [o.id, o.maxT]));
 
@@ -143,6 +158,36 @@ export const STRATEGIES: Record<string, { label: string; strategy: Strategy }> =
       maintain: true, desulf: true, spread: true, leaseFields: [{ id: 'f1', crop: 'zweikultur' }], spotBelowDays: 15, reactToFos: true,
     }),
   },
+  // Lernender Spieler: was nach dem ersten Scheitern typischerweise anders gemacht wird
+  versuch2: {
+    label: 'Zweiter Versuch: bringt nach dem Überlauf Gärrest aus, sonst wie naiv',
+    strategy: profileStrategy({ feed: { mais: 30 }, maizeContracts: { lw_brandt: 2500 }, spread: true }),
+  },
+  versuch3: {
+    label: 'Dritter Versuch: Ausbringung, genug Mais unter dem Deckel, Wartung',
+    strategy: profileStrategy({
+      maizeContracts: { lw_wendt: 1500, lw_brandt: 2500, lw_lindner: 3000 },
+      maintain: true, desulf: true, spread: true, spotBelowDays: 15,
+    }),
+  },
+  mais_maximal: {
+    label: 'Mais bis an den Deckel: 30 t Mais, 45 t Gülle, alle Maisverträge',
+    strategy: profileStrategy({
+      feed: { mais: 30, guelle: 45 }, guelle: ['th_seidel'], maizeContracts: ALL_MAIZE,
+      maintain: true, desulf: true, spread: true, spotBelowDays: 15, reactToFos: true,
+    }),
+  },
+  mit_techniker: { label: 'Ohne Personal plus Verfahrenstechniker', strategy: withStaff('techniker') },
+  mit_biologin: { label: 'Ohne Personal plus Biologin', strategy: withStaff('biologin') },
+  mit_agrar: { label: 'Ohne Personal plus Agrarberaterin', strategy: withStaff('agrar') },
+  mit_vermarkter: { label: 'Ohne Personal plus Energievermarkter', strategy: withStaff('vermarkter') },
+  vorbildlich: {
+    label: 'Ausgewogen mit Techniker und Vermarkter, nach der Ernte Abdeckung, Gasspeicher und Wärmeleitung',
+    strategy: profileStrategy({
+      ...BALANCED, staff: ['vermarkter', 'techniker'],
+      buildsLater: [{ kind: 'cover', date: [11, 1] }, { kind: 'gasStorage', date: [12, 1] }, { kind: 'heatLine', date: [1, 15] }],
+    }),
+  },
   dauerfackel: {
     label: 'Mehr Gas als das BHKW verwerten kann, ferne Lieferanten, offenes Lager',
     strategy: profileStrategy({
@@ -150,6 +195,41 @@ export const STRATEGIES: Record<string, { label: string; strategy: Strategy }> =
       maizeContracts: { ag_heidekamp: 5000, lw_lindner: 3000 },
       maintain: true, desulf: true, spread: true, spotBelowDays: 15,
     }),
+  },
+  ueberfuettern_biologin: {
+    label: 'Wie ueberfuettern, aber mit Biologin',
+    strategy: (s) => {
+      const base = profileStrategy({ ...BALANCED, staff: ['biologin'] })(s);
+      if (s.day === 120) base.push({ type: 'setFeeding', feed: { mais: 40 } });
+      return base;
+    },
+  },
+  nur_mais_biologin: {
+    label: 'Wie nur_mais, aber mit Biologin',
+    strategy: profileStrategy({
+      feed: { mais: 29, guelle: 0 }, cancelGuelle: ['th_haase', 'th_koenig'], maizeContracts: ALL_MAIZE,
+      maintain: true, desulf: true, spread: true, spotBelowDays: 20, staff: ['biologin'],
+    }),
+  },
+  standort_angepasst: {
+    label: 'Ausgewogen plus ferner Güllelieferant (für den schwierigen Standort)',
+    strategy: profileStrategy({ ...BALANCED, guelle: ['th_seidel'] }),
+  },
+  steigern: {
+    label: 'Ausgewogen, im Winter Mais von 24 auf 33 t auf einmal erhöht',
+    strategy: (s) => {
+      const base = profileStrategy(BALANCED)(s);
+      if (s.day === 120) base.push({ type: 'setFeeding', feed: { mais: 33 } });
+      return base;
+    },
+  },
+  steigern_biologin: {
+    label: 'Wie steigern, aber mit Biologin',
+    strategy: (s) => {
+      const base = profileStrategy({ ...BALANCED, staff: ['biologin'] })(s);
+      if (s.day === 120) base.push({ type: 'setFeeding', feed: { mais: 33 } });
+      return base;
+    },
   },
   ueberfuettern: {
     label: 'Ausgewogen, dann im Winter schnell auf viel mehr Mais erhöht',
