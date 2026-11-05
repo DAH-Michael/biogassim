@@ -204,4 +204,6 @@ export function takeGuelle(state: GameState, wantT: number): { t: number; traffi
 export function notifySupplyOffers(state: GameState): void {
   if (state.day === 0) say(state, 'landwirt', 'mais_angebot', {});
   if (state.day === windowDays(K.ryeOfferWindow).start) say(state, 'landwirt', 'roggen_angebot', {});
+  if (state.day === dayOfDate(CONFIG.messages.stubbleDigestate)) say(state, 'landwirt', 'gaerrest_stoppel', {});
+  if (state.day === dayOfDate(CONFIG.digestate.blackout.to) + 1) say(state, 'landwirt', 'gaerrest_fruehjahr', {});
 }

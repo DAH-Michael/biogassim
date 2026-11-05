@@ -2,7 +2,7 @@
 
 A small sim game to promote biogas.
 
-Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 2, Darstellung** (Bedienung folgt in Meilenstein 3).
+Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 3, Bedienung** (Scheitern und Analyse folgen in Meilenstein 4).
 
 ## Befehle
 
@@ -17,7 +17,15 @@ npm run sim -- --strategy alle --seeds 30             # Übersicht aller Strateg
 npm run sim -- --strategy ausgewogen --scenario eigene_felder
 ```
 
-URL-Parameter zum Anschauen (bis die Bedienung steht):
+Bedienung: Leiste links mit den Entscheidungsbereichen, Kennwertleiste rechts, Meldungen unten. Objekte in der Szene lassen sich antippen und öffnen den passenden Bereich.
+
+| Taste | Wirkung |
+|---|---|
+| Leertaste, 0, 1, 2 | Pause, normal, doppelt |
+| F, B, A, T, P, G, U, K | Fütterung, Beschaffung, Felder (Acker), Technik, Personal, Gärrest, Ausbau und Dorf, Finanzen (Konto) |
+| Esc | Bereich schließen |
+
+URL-Parameter für Abnahme und Balancing:
 
 | Parameter | Wirkung |
 |---|---|
@@ -27,6 +35,7 @@ URL-Parameter zum Anschauen (bis die Bedienung steht):
 | `?szenario=eigene_felder` | Startszenario mit eigenen Feldern |
 | `?waerme` | Wärmeleitung ab Start |
 | `?speed=2`, mit `?debug` bis 50 | Geschwindigkeit |
+| `?debug` | höhere Geschwindigkeiten, Lesezugriff `window.biogas.state` (Debug-Panel folgt in Meilenstein 6) |
 
 Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_aufschieben`, `kein_personal`, `dauerfackel`, `ueberfuettern` (siehe `src/sim/strategies/index.ts`).
 
@@ -43,7 +52,8 @@ Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_a
 | `src/render/` | Canvas-2D-Darstellung: Projektion, Palette aus Designsystem-Tokens, Lageplan, Fahrzeuge, Szene |
 | `src/styles/`, `src/assets/fonts/` | CSS-Variablen aus dem Designsystem, lokale WOFF2-Schriften |
 | `design/tokens.json` | Export des DAH Designsystems |
-| `src/ui/` | folgt ab Meilenstein 3 |
+| `src/ui/` | Oberfläche: Spielsteuerung, Kennwertleiste, Entscheidungsbereiche, Meldungen |
+| `src/content/messages.de.ts` | Texte der Meldungen aus der Welt |
 | `tools/simulate.ts` | Konsolenwerkzeug |
 | `docs/` | Annahmen, Modell, offene Punkte |
 

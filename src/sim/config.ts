@@ -678,6 +678,12 @@ export const CONFIG = {
     maxPerSubstrate: { mais: 60, gruenroggen: 60, guelle: 120, reststoff: 30 },
   },
 
+  /** Beiläufige Meldungen aus der Welt ohne eigene Kausalität */
+  messages: {
+    /** Landwirt bietet Stoppelflächen für Gärrest an */
+    stubbleDigestate: [8, 6] as MonthDay,
+  },
+
   /** Startszenarien. Faktoren wirken auf Gülleangebot, Transportwege, Verkehrstoleranz und Akzeptanz. */
   scenarios: {
     altanlage: { fieldsOwned: false, guelleSupply: 1, guelleDistance: 1, trafficTolerance: 1, acceptanceStart: 0, acceptanceBaseline: 0 },

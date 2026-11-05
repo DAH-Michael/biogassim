@@ -7,26 +7,8 @@
     <meta name="description" content="Browserspiel der DAH Gruppe: eine Biogasanlage ein Jahr lang führen." />
   </head>
   <body>
-    <div id="app" class="app">
-      <header class="topbar">
-        <div class="brand">Biogas-Anlage</div>
-        <div class="calendar" aria-live="polite">
-          <span id="date" class="calendar__date"></span>
-          <span id="season" class="calendar__meta"></span>
-        </div>
-        <div class="time" role="group" aria-label="Zeit">
-          <button type="button" class="time__btn" data-speed="0" aria-label="Pause" title="Pause (Leertaste)">❚❚</button>
-          <button type="button" class="time__btn" data-speed="1" aria-label="Normale Geschwindigkeit" title="Normal (1)">▶</button>
-          <button type="button" class="time__btn" data-speed="2" aria-label="Doppelte Geschwindigkeit" title="Doppelt (2)">▶▶</button>
-        </div>
-      </header>
-      <main class="stage">
-        <canvas id="scene" aria-label="Ansicht der Biogasanlage mit Feldern und Dorf"></canvas>
-      </main>
-    </div>
-    <div class="rotate" role="alert">
-      <p>Bitte das Gerät ins Querformat drehen.</p>
-    </div>
+    <div id="app" class="app"></div>
+    <div class="rotate" role="alert"><p>Bitte das Gerät ins Querformat drehen.</p></div>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
