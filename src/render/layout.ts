@@ -57,8 +57,8 @@ const north: Origin = { route: [[NORTH_ROAD_X, 0], [NORTH_ROAD_X, ROAD_Y], GATE_
 
 export const ORIGINS: Record<string, Origin> = {
   lw_wendt: west([3, 14]),
-  lw_brandt: west([8, 6]),
-  lw_brandt_r: west([8, 6]),
+  lw_brandt: west([15, 10]),
+  lw_brandt_r: west([15, 10]),
   th_haase: west([5, 27]),
   lw_lindner: east,
   th_koenig: east,
@@ -72,6 +72,31 @@ export const ORIGINS: Record<string, Origin> = {
   f3: { route: [[48, 6], ...FIELDS.f3.access, GATE_EAST] },
 };
 
+/**
+ * Felder, auf denen Vertragslandwirte sichtbar ernten. n0 ist die Nachbarfläche von Hof Brandt.
+ * Eigene Felder des Spielers werden nur genutzt, solange sie noch an den Landwirt verpachtet sind.
+ */
+export const FIELD_ROUTES: Record<string, Pt[]> = {
+  f1: ORIGINS.f1.route,
+  f2: ORIGINS.f2.route,
+  f3: ORIGINS.f3.route,
+  n0: [[7, 5.5], [7, 10.5], [15, 10.5], [15, ROAD_Y], GATE_WEST],
+};
+export const CONTRACT_FIELDS: Record<string, string> = {
+  lw_wendt: 'f1',
+  lw_brandt: 'n0',
+  lw_brandt_r: 'n0',
+  lw_lindner: 'f2',
+  ag_heidekamp: 'f3',
+  ag_heidekamp_r: 'f3',
+};
+
+/** Ausgehende Wege: Gärrest zu Abnahmebetrieben, Silage an Händler. */
+export const OUT_ROUTES = {
+  offtake: [[PLANT.storage.cx, ROAD_Y], GATE_EAST, [WORLD.w, ROAD_Y]] as Pt[],
+  silageSale: [[PLANT.siloApron[0], ROAD_Y], GATE_EAST, [NORTH_ROAD_X, ROAD_Y], [NORTH_ROAD_X, 0]] as Pt[],
+};
+
 /** Zufahrt zum Ziel innerhalb der Anlage. */
 export const TARGETS: Record<'silo' | 'pit' | 'feeder', Pt[]> = {
   silo: [[PLANT.siloApron[0], ROAD_Y], PLANT.siloApron],
@@ -81,6 +106,6 @@ export const TARGETS: Record<'silo' | 'pit' | 'feeder', Pt[]> = {
 
 /** Wege der Gärrestausbringung zu den Nachbarflächen. */
 export const SPREAD_ROUTES: Pt[][] = [
-  [[PLANT.storage.cx, ROAD_Y], GATE_WEST, [14, ROAD_Y], [14, 5.5], [12, 5.5]],
   [[PLANT.storage.cx, ROAD_Y], [28, ROAD_Y], [28, 36]],
+  [[PLANT.storage.cx, ROAD_Y], GATE_EAST, [WORLD.w - 1, ROAD_Y]],
 ];

@@ -79,14 +79,16 @@ Jeder Versuch deckt ein neues Teilsystem auf, und jedes Scheitern schaltet ein p
 
 ## Personal
 
-| Fachkraft | Wirkung in ruhigen Jahren | Wirkung im Risiko |
-|---|---|---|
-| Verfahrenstechniker | Gewinn etwa gleich, Gasverluste 3,3 statt 5,5 %, fast immer „Gut geführt“ | weniger und kürzere Ausfälle, Wartung und Entschwefelung laufen von selbst |
-| Energievermarkter | rund 40.000 € mehr Gewinn, mit größerem Gasspeicher mehr | keine |
-| Agrarberaterin | etwas weniger Gewinn ohne eigene Felder (bessere Preise und Silage gleichen die Kosten fast aus) | mehr Gärrestabnehmer, bessere Erträge eigener Felder |
-| Biologin | kostet etwa ihr Gehalt; der Mehrertrag wirkt nur, wenn der Spieler die Fütterung entsprechend senkt | verhindert den biologischen Totalausfall bei Überfütterung (2 statt 49 von 50) und bei reinem Mais |
+Nach dem ersten Test auf realistische Vollzeitkosten umgestellt (Arbeitgeberkosten pro Monat, brutto plus rund 21 % Sozialabgaben): Biologin 5.700 €, Verfahrenstechniker 5.000 €, Agrarberaterin 5.200 €, Energievermarkter 5.800 €. Die Wirkungen sind auf plausible Größen gesetzt: Der Techniker macht kleine Wartungen selbst und stellt den Motor nach (1,5 % mehr elektrischer Wirkungsgrad), der Vermarkter erzielt 2 ct/kWh Mehrerlös, die Agrarberaterin 10 % bessere Preise, die Biologin 5 % Mehrertrag.
 
-Die Biologin rechnet sich also nur, wenn es riskant wird. Das halte ich für ehrlich: Fachwissen ist eine Versicherung, kein Bonus. Wer will, dass sie sich auch im ruhigen Betrieb sichtbar lohnt, kann ihren Mehrertrag in `config.ts` erhöhen.
+| Fachkraft (je 30 Seeds) | Normal: Gewinn ggü. ohne Personal | Real: Gewinn ggü. ohne Personal | Wirkung im Risiko |
+|---|---|---|---|
+| Verfahrenstechniker | rund +4.000 € | rund +12.000 € | Gasverluste 3,3 statt 5,3 %, fast immer „Gut geführt“ |
+| Energievermarkter | nur in Real | rund +11.000 € | keine |
+| Agrarberaterin | nur in Real | rund −46.000 € ohne eigene Felder | bessere Erträge eigener Felder, mehr Gärrestabnehmer |
+| Biologin | rund −57.000 € | rund −68.000 € | verhindert den biologischen Totalausfall bei Überfütterung und bei reinem Mais |
+
+Biologin und Agrarberaterin rechnen sich an einer einzelnen 500-kW-Anlage in ruhigen Jahren nicht. Das entspricht der Praxis: Kleinere Anlagen kaufen biologische Betreuung und Agrarberatung meist als Dienstleistung zu, statt Fachleute fest anzustellen. Ihr Wert zeigt sich im Risiko. Wer möchte, dass sich auch diese Rollen im Spiel als Festanstellung lohnen, bräuchte entweder größere Anlagen oder ein Modell „Dienstleister statt Festanstellung“ mit geringeren Kosten und schwächerer Wirkung.
 
 ## Szenarien
 

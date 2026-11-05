@@ -2,7 +2,7 @@ import { CONFIG } from '../sim/config';
 import { dateOfDay, formatDate } from '../sim/calendar';
 import { buildAnalysis } from './analysis';
 import type { GameState } from '../sim/types';
-import { Scene } from '../render/scene';
+import { Scene, type HoverShape } from '../render/scene';
 import { unproject } from '../render/iso';
 import { FIELDS, PLANT, VILLAGE } from '../render/layout';
 import { GameController } from './game';
@@ -19,21 +19,27 @@ import { TIPS } from '../content/tooltips.de';
  */
 const SEASONS: Record<number, string> = { 12: 'Winter', 1: 'Winter', 2: 'Winter', 3: 'Frühjahr', 4: 'Frühjahr', 5: 'Frühjahr', 6: 'Sommer', 7: 'Sommer', 8: 'Sommer', 9: 'Herbst', 10: 'Herbst', 11: 'Herbst' };
 
-/** Antippbare Bereiche der Szene (Weltkoordinaten) und der zugehörige Entscheidungsbereich. */
-interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean }
-const inCircle = (cx: number, cy: number, r: number) => (x: number, y: number) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
-const inRect = (rx: number, ry: number, w: number, d: number) => (x: number, y: number) => x >= rx && x <= rx + w && y >= ry && y <= ry + d;
+/** Antippbare Bereiche der Szene (Weltkoordinaten), der zugehörige Entscheidungsbereich und die Hervorhebung. */
+interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean; shape: HoverShape }
+const circle = (panel: string, name: string, cx: number, cy: number, r: number, h: number, pad = 0): Hit => ({
+  panel, label: name, test: (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= (r + pad) ** 2, shape: { kind: 'circle', cx, cy, r, h, label: name },
+});
+const rect = (panel: string, name: string, rx: number, ry: number, w: number, d: number, h: number): Hit => ({
+  panel, label: name, test: (x, y) => x >= rx && x <= rx + w && y >= ry && y <= ry + d, shape: { kind: 'rect', x: rx, y: ry, w, d, h, label: name },
+});
+const P = PLANT;
 const HITS: Hit[] = [
-  { panel: 'feed', label: 'Fermenter', test: inCircle(PLANT.fermenter.cx, PLANT.fermenter.cy, PLANT.fermenter.r) },
-  { panel: 'feed', label: 'Nachgärer', test: inCircle(PLANT.post.cx, PLANT.post.cy, PLANT.post.r) },
-  { panel: 'feed', label: 'Eintrag', test: inRect(PLANT.feeder.x, PLANT.feeder.y, PLANT.feeder.w, PLANT.feeder.d) },
-  { panel: 'supply', label: 'Fahrsilo', test: inRect(PLANT.silo.x, PLANT.silo.y, PLANT.silo.w, PLANT.silo.d) },
-  { panel: 'tech', label: 'BHKW', test: inRect(PLANT.chp.x - 0.5, PLANT.chp.y - 0.5, PLANT.chp.w + 1, PLANT.chp.d + 1) },
-  { panel: 'tech', label: 'Entschwefelung', test: inCircle(PLANT.desulf.cx, PLANT.desulf.cy, PLANT.desulf.r + 0.4) },
-  { panel: 'tech', label: 'Notfackel', test: inCircle(PLANT.flare.x, PLANT.flare.y, 0.9) },
-  { panel: 'dig', label: 'Gärrestlager', test: inCircle(PLANT.storage.cx, PLANT.storage.cy, PLANT.storage.r) },
-  ...Object.entries(FIELDS).map(([, f]) => ({ panel: 'fields', label: 'Feld', test: inRect(f.x, f.y, f.w, f.d) })),
-  ...VILLAGE.houses.map(([x, y]) => ({ panel: 'build', label: 'Dorf', test: inRect(x - 0.3, y - 0.3, 2.4, 2.2) })),
+  circle('feed', 'Fermenter, öffnet Fütterung', P.fermenter.cx, P.fermenter.cy, P.fermenter.r, P.fermenter.h),
+  circle('feed', 'Nachgärer mit Gasspeicher, öffnet Fütterung', P.post.cx, P.post.cy, P.post.r, P.post.h + P.post.r * 0.6),
+  rect('feed', 'Feststoffeintrag, öffnet Fütterung', P.feeder.x, P.feeder.y, P.feeder.w, P.feeder.d, P.feeder.h),
+  circle('feed', 'Vorgrube für Gülle, öffnet Fütterung', P.pit.cx, P.pit.cy, P.pit.r, 0.5, 0.3),
+  rect('supply', 'Fahrsilo, öffnet Beschaffung', P.silo.x - 0.3, P.silo.y - 0.3, P.silo.w + 0.6, P.silo.d + 0.3, P.silo.wall),
+  rect('tech', 'BHKW, öffnet Technik', P.chp.x, P.chp.y, P.chp.w, P.chp.d, P.chp.h),
+  circle('tech', 'Entschwefelung, öffnet Technik', P.desulf.cx, P.desulf.cy, P.desulf.r, P.desulf.h, 0.4),
+  circle('tech', 'Notfackel, öffnet Technik', P.flare.x, P.flare.y, 0.5, P.flare.h, 0.4),
+  circle('dig', 'Gärrestlager, öffnet Gärrest', P.storage.cx, P.storage.cy, P.storage.r, P.storage.h),
+  ...Object.entries(FIELDS).map(([, f]) => rect('fields', 'Feld, öffnet Felder', f.x, f.y, f.w, f.d, 0)),
+  ...VILLAGE.houses.map(([x, y]) => rect('build', 'Dorf, öffnet Ausbau und Dorf', x, y, 1.8, 1.6, 1.9)),
 ];
 /** Höhen, auf denen ein Klick getestet wird (für hohe Objekte). */
 const HIT_HEIGHTS = [3, 2, 1, 0];
@@ -116,6 +122,7 @@ export class App {
     }).observe(stage);
 
     this.setupZoom(stage);
+    this.canvas.addEventListener('mouseleave', () => this.scene.setHover(null));
     this.canvas.addEventListener('click', (e) => {
       if (this.dragged) return;
       this.onCanvasClick(e);
@@ -124,7 +131,7 @@ export class App {
       if (this.pointers.size) return;
       const hit = this.hitAt(e);
       this.canvas.style.cursor = hit ? 'pointer' : this.scene.zoomLevel > 1 ? 'grab' : 'default';
-      this.canvas.title = hit ? hit.label : '';
+      this.scene.setHover(hit ? hit.shape : null);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
 

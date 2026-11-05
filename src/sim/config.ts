@@ -506,7 +506,7 @@ export const CONFIG = {
       maxTPerOrder: 300,
     },
     /** Agrarberaterin: Preisnachlass bei Vertragsabschluss */
-    advisorPriceDiscount: 0.08,
+    advisorPriceDiscount: 0.1,
     /** Agrarberaterin: Silagequalität aus Lieferverträgen (berät Erntezeitpunkt und Verdichtung). Richtwert, fachlich prüfen */
     advisorContractQuality: 0.9,
   },
@@ -538,13 +538,20 @@ export const CONFIG = {
     contaminantFeedFactor: 0.5,
   },
 
-  /** Personal. Kosten inklusive Nebenkosten, €/Monat, anteilig für diese Anlage (Teilzeit oder geteilt mit Nachbaranlagen, Annahme). Richtwert, fachlich prüfen */
+  /**
+   * Personal in Vollzeit. Arbeitgeberkosten pro Monat: Bruttogehalt plus rund 21 % Sozialabgaben
+   * (Annahme ländlicher Raum Ostdeutschland, Stand 2026). Richtwert, fachlich prüfen.
+   * Biologin: Master Agrar- oder Biowissenschaften, brutto rund 4.700 €.
+   * Verfahrenstechniker: staatlich geprüfter Techniker oder Meister, brutto rund 4.100 €.
+   * Agrarberaterin: Agraringenieurin, brutto rund 4.300 €.
+   * Energievermarkter: Energiewirtschaft mit Handelserfahrung, brutto rund 4.800 €.
+   */
   staff: {
     roles: {
-      biologin: { salaryEurPerMonth: 2500 },
-      techniker: { salaryEurPerMonth: 3500 },
-      agrar: { salaryEurPerMonth: 2000 },
-      vermarkter: { salaryEurPerMonth: 2500 },
+      biologin: { salaryEurPerMonth: 5700 },
+      techniker: { salaryEurPerMonth: 5000 },
+      agrar: { salaryEurPerMonth: 5200 },
+      vermarkter: { salaryEurPerMonth: 5800 },
     },
     /** Einarbeitung bis zur Wirkung, Tage */
     onboardingDays: 14,
@@ -553,13 +560,17 @@ export const CONFIG = {
     /** Biologin: maximale Änderung der tatsächlichen Mischung pro Tag (sanfter Wechsel) */
     biologistRampPerDay: 0.015,
     /** Biologin: Mehrertrag durch bessere Prozessführung (Enzyme, Spurenelemente, Rührzeiten), Anteil. Richtwert, fachlich prüfen */
-    biologistYieldBonus: 0.04,
+    biologistYieldBonus: 0.05,
     /** Biologin: Spurenelementdosierung, € pro t oTS */
     traceDosingEurPerTots: 4,
     /** Techniker: Faktor auf Ausfallwahrscheinlichkeit, Verschleiß und Stillstandsdauer */
-    technicianFailureFactor: 0.55,
+    technicianFailureFactor: 0.4,
     technicianWearFactor: 0.85,
     technicianDowntimeFactor: 0.5,
+    /** Techniker macht kleine Wartungen selbst: nur Teile, keine Monteurstunden (Anteil der Kosten) */
+    technicianServiceCostFactor: 0.4,
+    /** Techniker stellt den Motor nach (Zündung, Gemisch): relativer Gewinn an elektrischem Wirkungsgrad */
+    technicianEtaBonus: 0.015,
     /** Techniker beauftragt kleine Wartung ... Stunden vor Fälligkeit */
     technicianServiceLeadH: 100,
     /** Techniker füllt Entschwefelung nach unter ... Tagen Vorrat */
@@ -568,7 +579,7 @@ export const CONFIG = {
     advisorYieldBonus: 0.08,
     advisorDemandBonus: 0.35,
     /** Energievermarkter: Zusatzerlös €/kWh plus je Stunde Gasspeicher über Referenz */
-    marketerBaseEurPerKwh: 0.016,
+    marketerBaseEurPerKwh: 0.02,
     marketerPerStorageHourEurPerKwh: 0.0015,
     marketerReferenceStorageHours: 6,
   },

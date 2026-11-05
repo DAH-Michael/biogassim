@@ -64,6 +64,7 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
       silo.poorCompactionEvent = ev.id;
     }
     if (overflowT > 0) {
+      state.today.siloSoldT += overflowT;
       state.finance.balance += overflowT * S.overflowSalePricePerT;
       state.finance.ledger.silageSold = (state.finance.ledger.silageSold ?? 0) + overflowT * S.overflowSalePricePerT;
       if (!silo.overflowEvent) {
@@ -152,8 +153,10 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
     }
   }
   // Abnahmeverträge (Freischaltung): Abgabe an Betriebe mit eigenem Lager, ganzjährig
+  dg.offtakeToday = 0;
   if (dg.offtake) {
     const amount = Math.min(D.offtake.m3PerDay, dg.m3);
+    dg.offtakeToday = amount;
     dg.m3 -= amount;
     dg.spreadToday += amount;
     dg.spreadTotal += amount;

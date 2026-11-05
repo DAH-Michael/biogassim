@@ -1,13 +1,14 @@
 import { CONFIG } from '../sim/config';
 import type { GameState } from '../sim/types';
-import { FIELDS, ORIGINS, SPREAD_ROUTES, TARGETS, type Pt } from './layout';
+import { CONTRACT_FIELDS, FIELD_ROUTES, FIELDS, ORIGINS, OUT_ROUTES, SPREAD_ROUTES, TARGETS, type Pt } from './layout';
 
 /**
- * Fahrzeuge eines Spieltags. Aus der Logistik des Tages (state.today) wird ein
- * Fahrplan erzeugt: Jede Fahrt startet zu einem Zeitpunkt im Tag, fährt die Route
- * hin und zurück. Längere Wege dauern sichtbar länger.
+ * Fahrzeuge eines Spieltags, abgeleitet aus der tatsächlichen Logistik (state.today):
+ * je Ladung ein Fahrzeug, mit einer Obergrenze für die Darstellung. Eingehend: Silage,
+ * Gülle, Reststoffe. Ausgehend: Gärrest aufs Feld und an Abnahmebetriebe, Silage bei vollem Silo.
+ * Längere Wege dauern sichtbar länger.
  */
-export type VehicleKind = 'lkw_silage' | 'lkw_guelle' | 'lkw_rest' | 'traktor' | 'guellefass';
+export type VehicleKind = 'lkw_silage' | 'lkw_guelle' | 'lkw_rest' | 'lkw_gaerrest' | 'traktor' | 'guellefass';
 
 export interface Trip {
   kind: VehicleKind;
@@ -15,18 +16,20 @@ export interface Trip {
   start: number;
   /** Dauer der Hinfahrt als Anteil am Tag */
   duration: number;
-  /** Arbeit auf dem Feld am Ende der Route (Gärrest) */
-  fieldWork?: { x: number; y: number; w: number; d: number };
 }
 
 const DISPLAY = {
-  maxTripsPerOrigin: 6,
+  maxTripsPerSource: 10,
   /** Weltlänge, die ein Fahrzeug pro Tagesanteil zurücklegt */
   speed: 220,
   /** zusätzlicher unsichtbarer Weg pro km Entfernung (ferne Lieferanten kommen später) */
   offmapPerKm: 2.5,
-  dayWindow: 0.75,
-  spreadM3PerTrip: 25,
+  /** Fahrten verteilen sich über diesen Anteil des Tages */
+  dayWindow: 0.8,
+  /** Ladung je Fahrzeug, t oder m³ */
+  tractorT: CONFIG.fields.trailerT,
+  truckT: CONFIG.contracts.guelleTruckT,
+  slurryTankerM3: 18,
 };
 
 function routeLength(r: Pt[]): number {
@@ -35,58 +38,63 @@ function routeLength(r: Pt[]): number {
   return l;
 }
 
+/** Feld, auf dem ein Vertragslandwirt heute sichtbar erntet (oder null). */
+export function contractField(state: GameState, origin: string): string | null {
+  const key = CONTRACT_FIELDS[origin];
+  if (!key) return null;
+  if (key === 'n0') return key;
+  const f = state.fields.find((x) => x.id === key);
+  // Nur solange das Feld noch dem Landwirt gehört (verpachtet)
+  return f && f.status === 'verpachtet' ? key : null;
+}
+
 export function planTrips(state: GameState): Trip[] {
   const trips: Trip[] = [];
-  const add = (kind: VehicleKind, origin: string, count: number, target: Pt[], distanceKm: number) => {
-    const o = ORIGINS[origin] ?? ORIGINS.spot;
-    const route = [...o.route, ...target];
-    const n = Math.min(DISPLAY.maxTripsPerOrigin, Math.max(1, count));
-    const len = routeLength(route) + distanceKm * DISPLAY.offmapPerKm;
-    const duration = Math.min(0.45, len / DISPLAY.speed);
-    for (let i = 0; i < n; i++) {
-      trips.push({ kind, route, start: (i / n) * DISPLAY.dayWindow + ((origin.length * 0.037) % 0.08), duration });
-    }
-  };
   const t = state.today;
+  const add = (kind: VehicleKind, route: Pt[], amount: number, perLoad: number, offmapKm: number, phase = 0) => {
+    if (amount <= 0) return;
+    const n = Math.min(DISPLAY.maxTripsPerSource, Math.max(1, Math.ceil(amount / perLoad)));
+    const len = routeLength(route) + offmapKm * DISPLAY.offmapPerKm;
+    const duration = Math.min(0.4, len / DISPLAY.speed);
+    for (let i = 0; i < n; i++) trips.push({ kind, route, start: phase + (i / n) * (DISPLAY.dayWindow - duration * 0.5), duration });
+  };
+
+  // Silage: eigene Felder und Vertragsfelder mit Traktor, sonst Lkw vom Hof oder vom Kartenrand
   for (const d of t.deliveries) {
-    const isField = d.origin in FIELDS;
-    add(isField ? 'traktor' : 'lkw_silage', d.origin, Math.ceil(d.t / CONFIG.fields.trailerT), TARGETS.silo, isField ? 0 : d.distanceKm);
-  }
-  for (const g of t.guelle) add('lkw_guelle', g.origin, Math.ceil(g.t / CONFIG.contracts.guelleTruckT), TARGETS.pit, g.distanceKm);
-  if (t.residueArrived) add('lkw_rest', 'reststoff', 2, TARGETS.feeder, CONFIG.residues.distanceKm);
-  if (t.spreadM3 > 0) {
-    const n = Math.min(DISPLAY.maxTripsPerOrigin, Math.ceil(t.spreadM3 / DISPLAY.spreadM3PerTrip / 4));
-    for (let i = 0; i < n; i++) {
-      const route = SPREAD_ROUTES[i % SPREAD_ROUTES.length];
-      trips.push({ kind: 'guellefass', route, start: (i / n) * DISPLAY.dayWindow, duration: Math.min(0.3, routeLength(route) / DISPLAY.speed) });
+    if (d.origin in FIELDS && !(d.origin in CONTRACT_FIELDS) && state.fields.some((f) => f.id === d.origin)) {
+      add('traktor', [...ORIGINS[d.origin].route, ...TARGETS.silo], d.t, DISPLAY.tractorT, 0);
+      continue;
     }
+    const field = contractField(state, d.origin);
+    if (field) add('traktor', [...FIELD_ROUTES[field], ...TARGETS.silo], d.t, DISPLAY.tractorT, 0, 0.02);
+    else add('lkw_silage', [...(ORIGINS[d.origin] ?? ORIGINS.spot).route, ...TARGETS.silo], d.t, DISPLAY.truckT, d.distanceKm, 0.04);
   }
+  for (const g of t.guelle) add('lkw_guelle', [...(ORIGINS[g.origin] ?? ORIGINS.th_haase).route, ...TARGETS.pit], g.t, DISPLAY.truckT, g.distanceKm, 0.01);
+  if (t.residueArrived) add('lkw_rest', [...ORIGINS.reststoff.route, ...TARGETS.feeder], DISPLAY.truckT * 2, DISPLAY.truckT, CONFIG.residues.distanceKm);
+
+  // Ausgehend: Gärrest aufs Feld (Güllefass), an Abnahmebetriebe (Lkw), Silage bei vollem Silo
+  if (t.spreadM3 > 0) {
+    const half = t.spreadM3 / SPREAD_ROUTES.length;
+    SPREAD_ROUTES.forEach((r, i) => add('guellefass', r, half, DISPLAY.slurryTankerM3, 0, 0.03 * i));
+  }
+  add('lkw_gaerrest', OUT_ROUTES.offtake, t.offtakeM3, DISPLAY.truckT, CONFIG.digestate.regionalDistanceKm, 0.05);
+  add('lkw_silage', OUT_ROUTES.silageSale, t.siloSoldT, DISPLAY.truckT, 0, 0.06);
   return trips;
 }
 
-/** Position eines Fahrzeugs zum Tagesanteil f, oder null wenn nicht unterwegs. */
+/** Position eines Fahrzeugs zum Tagesanteil f, oder null wenn nicht unterwegs. Hinweg beladen, Rückweg leer. */
 export function tripPosition(trip: Trip, f: number): { x: number; y: number; dir: 'x' | 'y'; loaded: boolean; working: boolean } | null {
   const local = (f - trip.start) / trip.duration;
   if (local < 0 || local > 2.4) return null;
   let p: number;
-  let loaded: boolean;
   let working = false;
-  if (local <= 1) {
-    p = local;
-    loaded = trip.kind !== 'guellefass';
-  } else if (local <= 1.4) {
-    // Abladen oder Ausbringen am Ziel
+  if (local <= 1) p = local;
+  else if (local <= 1.4) {
+    // Abladen an der Anlage oder Ausbringen auf dem Feld
     p = 1;
-    loaded = false;
     working = true;
-  } else {
-    p = 1 - (local - 1.4);
-    loaded = trip.kind === 'guellefass';
-  }
-  if (trip.kind === 'guellefass') {
-    // Güllefass fährt beladen hin und leer zurück
-    loaded = local <= 1;
-  }
+  } else p = 1 - (local - 1.4);
+  const loaded = local <= 1;
   const r = trip.route;
   const total = routeLength(r);
   let dist = Math.max(0, Math.min(1, p)) * total;

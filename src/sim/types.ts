@@ -197,6 +197,7 @@ export interface DigestateState {
   spreadOrderM3: number;
   spreadOrderEvent?: string;
   spreadToday: number;
+  offtakeToday: number;
   spreadTotal: number;
   /** Ausbringung im Zeitraum vor der Sperrfrist */
   spreadBeforeBlackout: number;
@@ -409,4 +410,8 @@ export interface TodayLogistics {
   /** Felder, die heute bestellt wurden */
   sowing: string[];
   spreadM3: number;
+  /** an Betriebe mit eigenem Lager abgegebener Gärrest, m³ */
+  offtakeM3: number;
+  /** wegen vollem Silo abgegebene Silage, t */
+  siloSoldT: number;
 }

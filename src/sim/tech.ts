@@ -230,7 +230,8 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
     gas.flareEvent = undefined;
   }
 
-  const kwhEl = ch4Used * PL.methaneKwhPerM3 * PL.chpEtaEl;
+  const eta = PL.chpEtaEl * (hasStaff(state, 'techniker') ? 1 + CONFIG.staff.technicianEtaBonus : 1);
+  const kwhEl = ch4Used * PL.methaneKwhPerM3 * eta;
   const kwhTh = ch4Used * PL.methaneKwhPerM3 * PL.chpEtaTh;
   return { kwhEl, kwhTh, ch4Used };
 }
@@ -255,7 +256,8 @@ export function performService(state: GameState, kind: 'klein' | 'gross' | 'ents
   const cfg = kind === 'klein' ? C.smallService : C.majorService;
   let days: number = cfg.downtimeDays;
   if (hasStaff(state, 'techniker')) days = Math.max(1, Math.round(days * CONFIG.staff.technicianDowntimeFactor));
-  const cost = kind === 'klein' && state.maintenanceContract ? 0 : cfg.costEur;
+  let cost = kind === 'klein' && state.maintenanceContract ? 0 : cfg.costEur;
+  if (kind === 'klein' && hasStaff(state, 'techniker')) cost *= CONFIG.staff.technicianServiceCostFactor;
   const ev = logEvent(state.log, state.day, {
     type: kind === 'klein' ? 'service_small' : 'service_major',
     causes: [cause],
