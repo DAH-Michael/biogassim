@@ -15,6 +15,7 @@ import { newUnlocks, codeForKeys } from './meta/progression';
 import { UNLOCKS } from './meta/unlocks.config';
 import type { Action, GameState, ScenarioOptions } from './sim/types';
 import { DebugPanel } from './ui/debug';
+import { Tooltips } from './ui/tooltip';
 import { UNLOCK_KEYS } from './sim/unlockKeys';
 
 /**
@@ -30,7 +31,7 @@ let strategyName = demo && STRATEGIES[demo] ? demo : '';
 let plan: (s: GameState) => Action[] = strategyName ? STRATEGIES[strategyName].strategy : () => [];
 const debug = params.has('debug');
 const maxSpeed = debug ? CONFIG.time.debugMaxSpeed : Math.max(...CONFIG.time.speeds);
-const testStart = ['seed', 'demo', 'tag', 'szenario', 'waerme'].some((k) => params.has(k));
+const testStart = ['seed', 'demo', 'tag', 'szenario', 'waerme', 'schwierigkeit'].some((k) => params.has(k));
 
 /** Metaprogression dieser Sitzung (nur im Speicher). */
 let unlocks: string[] = [];
@@ -51,10 +52,16 @@ function newController(seed: number, scenario: ScenarioOptions, jump: number, sp
 
 function urlScenario(): ScenarioOptions {
   const id = params.get('szenario');
-  return { id: id === 'eigene_felder' || id === 'schwieriger_standort' ? id : 'altanlage', heatLineAtStart: params.has('waerme') };
+  const lv = params.get('schwierigkeit');
+  return {
+    id: id === 'eigene_felder' || id === 'schwieriger_standort' ? id : 'altanlage',
+    difficulty: lv === 'vereinfacht' || lv === 'real' ? lv : 'normal',
+    heatLineAtStart: params.has('waerme'),
+  };
 }
 
 const root = document.getElementById('app')!;
+new Tooltips();
 let game = testStart
   ? newController(Number(params.get('seed')) || newSeed(), urlScenario(), Math.min(CONFIG.time.runDays - 1, Number(params.get('tag')) || 0), Number(params.get('speed') ?? 1))
   : newController(newSeed(), lastScenario, 0, 0);
@@ -75,6 +82,7 @@ function showMenu(): void {
       showMenu();
     },
     onStart: startRun,
+    difficulty: lastScenario.difficulty,
   }));
 }
 

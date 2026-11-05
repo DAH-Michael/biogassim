@@ -7,6 +7,7 @@ import { BACKGROUND, eventIcon, outcomeSentence, tierName } from '../content/ana
 import type { GameState } from '../sim/types';
 import { buildTimeline } from './charts';
 import { fmt, h } from './dom';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Analyse nach dem Ende eines Durchlaufs, in drei aufklappbaren Ebenen:
@@ -15,6 +16,8 @@ import { fmt, h } from './dom';
  * 3. Verläufe der wichtigsten Werte mit Ereignismarken.
  * Bei Erfolg: Jahresbilanz mit Bewertung, wichtige Ereignisse und Verläufe.
  */
+const LEVEL_NAMES = { vereinfacht: 'Vereinfacht', normal: 'Normal', real: 'Real' } as const;
+
 export interface AnalysisOptions {
   onRestart: () => void;
   onMenu?: () => void;
@@ -25,13 +28,13 @@ export interface AnalysisOptions {
 export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement {
   const y = yearSummary(s);
   const failed = s.failure !== null;
-  const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', onclick: opts.onRestart }, 'Neuer Versuch');
+  const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', 'data-tip': TIPS.restart, onclick: opts.onRestart }, 'Neuer Versuch');
 
   const head = h('header', { class: 'analysis__head' },
-    h('p', { class: 'eyebrow' }, failed ? 'Durchlauf beendet' : 'Jahresbilanz'),
+    h('p', { class: 'eyebrow' }, `${failed ? 'Durchlauf beendet' : 'Jahresbilanz'}, Stufe ${LEVEL_NAMES[s.scenario.difficulty ?? 'normal']}`),
     h('h2', { id: 'end-title' }, failed ? FAILURE_TITLES[s.failure!.kind] : tierName(y.tier)),
     h('p', { class: 'analysis__sentence' }, outcomeSentence(s)),
-    h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', onclick: opts.onMenu }, 'Zum Startmenü') : null),
+    h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', 'data-tip': TIPS.toMenu, onclick: opts.onMenu }, 'Zum Startmenü') : null),
   );
 
   const parts: HTMLElement[] = [head];

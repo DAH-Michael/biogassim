@@ -42,10 +42,10 @@ export const CONFIG = {
     runDays: 365,
     /** Starttag: 1. August, aus der Arbeitsanweisung */
     startDate: [8, 1] as MonthDay,
-    /** Echtzeit-Sekunden pro Spieltag bei einfacher Geschwindigkeit (10 min pro Jahr), Vorgabe */
-    realSecondsPerDayAt1x: 600 / 365,
+    /** Echtzeit-Sekunden pro Spieltag bei normaler Geschwindigkeit (20 min pro Jahr, Rückmeldung nach dem ersten Test) */
+    realSecondsPerDayAt1x: 1200 / 365,
     /** Wählbare Geschwindigkeiten */
-    speeds: [0, 1, 2] as readonly number[],
+    speeds: [0, 1, 2, 4] as readonly number[],
     /** Maximaler Zeitraffer im Debug-Modus */
     debugMaxSpeed: 50,
     /** Anzahl Tage für die Vorlaufsimulation der Biologie beim Start (stationärer Zustand) */
@@ -221,6 +221,8 @@ export const CONFIG = {
     measurement: {
       /** externes Labor ohne Personal: wöchentliche Probe, 3 Tage Verzug. Richtwert, fachlich prüfen */
       external: { intervalDays: 7, delayDays: 3, noise: 0.05, costEur: 150 },
+      /** Stufe Real: Probe wöchentlich, Ergebnis nach 5 Tagen, ungenauer. Richtwert, fachlich prüfen */
+      slow: { intervalDays: 7, delayDays: 5, noise: 0.07, costEur: 150 },
       /** mit Biologin: zweimal pro Woche, 1 Tag Verzug */
       biologist: { intervalDays: 3, delayDays: 1, noise: 0.03, costEur: 150 },
       /** eigenes Labor (Freischaltung): täglich, ohne Verzug */
@@ -689,6 +691,53 @@ export const CONFIG = {
   messages: {
     /** Landwirt bietet Stoppelflächen für Gärrest an */
     stubbleDigestate: [8, 6] as MonthDay,
+  },
+
+  /**
+   * Schwierigkeitsgrade: verändern die Simulationstiefe, unabhängig vom Startszenario.
+   * Sperrfrist und Maisdeckel gelten in allen Stufen, weil sie die Kernaussagen tragen.
+   */
+  difficulty: {
+    vereinfacht: {
+      /** Spurenelemente spielen keine Rolle */
+      traceElements: false,
+      /** Faktor auf die Belastung durch abrupte Substratwechsel */
+      shiftStressFactor: 0,
+      /** Faktor auf das Wachstum der Methanbildner */
+      growthFactor: 1.3,
+      /** Messniveau FOS/TAC ohne Personal: 'lab' täglich, 'external' wöchentlich, 'slow' wöchentlich mit längerem Verzug */
+      measurement: 'lab' as 'lab' | 'external' | 'slow',
+      /** Faktor auf zufällige BHKW-Störungen */
+      chpFailureFactor: 0,
+      /** Entschwefelungsmittel verbraucht sich */
+      desulfConsumable: false,
+      /** Verdichtung im Fahrsilo beeinflusst die Qualität */
+      siloCompaction: false,
+      /** Faktoren auf Störstoffrisiko und Qualitätsstreuung der Reststoffe */
+      contaminantFactor: 0,
+      residueSigmaFactor: 0.5,
+      /** Wahrscheinlichkeit eines Dürrejahrs */
+      droughtChance: 0,
+      /** Netzausfall und Rührwerksstörung je Tag (nur in Real) */
+      gridOutagePerDay: 0,
+      stirrerFailurePerDay: 0,
+    },
+    normal: {
+      traceElements: true, shiftStressFactor: 1, growthFactor: 1, measurement: 'external' as 'lab' | 'external' | 'slow',
+      chpFailureFactor: 1, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1, residueSigmaFactor: 1,
+      droughtChance: 0.15, gridOutagePerDay: 0, stirrerFailurePerDay: 0,
+    },
+    real: {
+      traceElements: true, shiftStressFactor: 1.3, growthFactor: 0.85, measurement: 'slow' as 'lab' | 'external' | 'slow',
+      chpFailureFactor: 1.4, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1.5, residueSigmaFactor: 1.3,
+      droughtChance: 0.25, gridOutagePerDay: 0.004, stirrerFailurePerDay: 0.003,
+    },
+  },
+  /** Netzausfall: BHKW steht, Dauer in Tagen. Rührwerksstörung: halbe Feststoffzufuhr, Tage und Kosten. Richtwert, fachlich prüfen */
+  realEvents: {
+    gridOutageDays: 1,
+    stirrerDays: [2, 4] as const,
+    stirrerRepairEur: [3000, 9000] as const,
   },
 
   /** Startszenarien. Faktoren wirken auf Gülleangebot, Transportwege, Verkehrstoleranz und Akzeptanz. */

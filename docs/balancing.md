@@ -130,3 +130,26 @@ Mit weniger Gülle in der Nähe reißen die üblichen Strategien den Maisdeckel.
 3. **Der Totalschaden bei aufgeschobener Wartung kommt früh** (Mitte November). Wer das Spiel länger erleben soll, bevor es endet, sollte den Startverschleiß oder den Verschleißzuschlag senken.
 4. **Wärmeleitung und Ausbauten lohnen sich in einem einzigen Jahr nur über die Bewertung**, nicht im Kontostand. Mehrjährige Durchläufe würden das ändern (bewusst nicht im Prototyp).
 5. **Testspieler sind keine Menschen.** Vor der Vorführung bei der Geschäftsführung sollten zwei oder drei Personen ohne Vorwissen spielen. Interessant ist vor allem, ob die Meldungen aus der Welt als Hinweise verstanden werden und ob die Analyse nach dem ersten Scheitern gelesen wird.
+
+## Schwierigkeitsgrade (nach dem ersten Test ergänzt)
+
+Die Stufen ändern die Simulationstiefe, nicht das Startszenario. Werte in `CONFIG.difficulty`.
+
+| Stufe | Was anders ist |
+|---|---|
+| Vereinfacht | keine Spurenelemente, kein Stress durch Futterwechsel, Methanbildner wachsen schneller, Laborwert täglich, keine zufälligen BHKW-Störungen, Entschwefelung ohne Verbrauch, keine Verdichtungsverluste, keine Störstoffe, keine Dürre |
+| Normal | wie bisher |
+| Real | Methanbildner wachsen langsamer, Futterwechsel belasten stärker, Laborwert nach fünf Tagen und ungenauer, mehr BHKW-Störungen, Netzausfälle, Rührwerksstörungen, häufiger Dürre, stärker schwankende Reststoffe |
+
+Sperrfrist und Maisdeckel gelten in allen Stufen. Der naive erste Versuch scheitert deshalb überall am Gärrestlager.
+
+Ergebnisse (je 30 Seeds, Altanlage):
+
+| Strategie | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| naiv | scheitert immer (Lager) | scheitert immer (Lager) | scheitert immer (Lager) |
+| versuch2 (Ausbringung, keine Wartung) | scheitert (BHKW-Totalschaden im März, danach kühlt der Fermenter aus) | scheitert (BHKW im November) | scheitert (BHKW im November) |
+| versuch3 | gelingt immer, Ø 129.000 € | gelingt immer, Ø 32.000 € | gelingt immer, Ø −19.000 € |
+| kein_personal | gelingt immer, Ø 134.000 € | gelingt immer, Ø 45.000 € | gelingt in 29 von 30, Ø 5.000 € |
+| nur_mais | übersteht das Jahr mit hohem Verlust (Maisdeckel) | scheitert immer | scheitert immer |
+| vorbildlich | immer „Vorbildlich“ | 13 von 30 „Vorbildlich“ | 13 von 30 „Vorbildlich“ |

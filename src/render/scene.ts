@@ -408,45 +408,44 @@ export class Scene {
     const S = PLANT.silo;
     const half = S.w / 2;
     const cap = CONFIG.plant.siloCapacityT / 2;
-    // Bodenplatte und Rückwand
-    d.rect(S.x, S.y, S.w, S.d, 0, p.concrete, p.k40);
-    d.box(S.x, S.y - 0.3, S.w, 0.3, S.wall, p.concrete);
-    // zwei Kammern: Mais links, Grünroggen rechts
-    const piles: [number, number, Rgb, number][] = [
-      [S.x, s.maisT, p.silage, st.silo.mais.quality],
-      [S.x + half, s.ryeT, p.silageRye, st.silo.gruenroggen.quality],
-    ];
-    for (const [x, tonnes, color, quality] of piles) {
+    // Stapelhöhe bleibt unter der Wandkrone, damit nichts durch die Wände ragt
+    const pileH = (fill: number) => 0.15 + fill * (S.wall - 0.3);
+    const activeKind = st.silo.deliveredToday > 0 ? (st.today.deliveries.some((x) => x.kind === 'gruenroggen') ? 1 : 0) : -1;
+
+    const drawChamber = (k: number, x: number, tonnes: number, color: Rgb, quality: number) => {
       const fill = clamp01(tonnes / cap);
-      if (fill <= 0.002) continue;
-      const h = 0.25 + fill * 2.4;
-      const depth = S.d * (0.35 + 0.65 * fill);
-      // Folie oben, Anschnitt vorne zeigt die Silage
-      d.box(x + 0.2, S.y, half - 0.4, depth, h, color, 0, p.foil);
-      // Reifen auf der Folie
-      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) d.disc(x + 0.9 + i * 1.3, S.y + 0.8 + j * (depth - 1.6), 0.18, h + 0.01, p.k100);
-      // Schimmel und Nacherwärmung bei schlechter Qualität: helle Flecken am Anschnitt
-      const spots = Math.round(clamp01((CONFIG.acceptance.silageGoodQuality - quality) * 6) * 8);
-      for (let i = 0; i < spots; i++) {
-        const sx = x + 0.5 + ((i * 0.83) % (half - 1.2));
-        const sz = 0.2 + ((i * 0.37) % 1) * (h - 0.4);
-        d.disc(sx, S.y + depth + 0.01, 0.16, sz, p.white, p.k60);
+      const h = pileH(fill);
+      if (fill > 0.002) {
+        // Befüllt von der Rückwand her, Anschnitt vorne zeigt die Silage, oben Folie
+        const depth = S.d * (0.3 + 0.7 * fill);
+        d.box(x + 0.2, S.y, half - 0.4, depth, h, color, 0, p.foil);
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) d.disc(x + 0.9 + i * 1.3, S.y + 0.6 + j * Math.max(0.4, depth - 1.2), 0.16, h + 0.01, p.k100);
+        // Schimmel und Nacherwärmung bei schlechter Qualität: helle Flecken am Anschnitt
+        const spots = Math.round(clamp01((CONFIG.acceptance.silageGoodQuality - quality) * 6) * 8);
+        for (let i = 0; i < spots; i++) {
+          const sx = x + 0.5 + ((i * 0.83) % (half - 1.2));
+          const sz = 0.1 + ((i * 0.37) % 1) * Math.max(0.1, h - 0.25);
+          d.disc(sx, S.y + depth + 0.01, 0.14, sz, p.white, p.k60);
+        }
       }
-    }
-    // Seitenwände
-    d.box(S.x - 0.3, S.y - 0.3, 0.3, S.d + 0.3, S.wall, p.concrete);
+      // Walzschlepper verdichtet, solange angeliefert wird
+      if (activeKind === k) {
+        const along = (Math.sin(t * 1.4) + 1) / 2;
+        const mx = x + 0.9 + along * (half - 2.0);
+        this.machine(d, mx, S.y + 1.4, p.dunkelgruen, 1.2, 0.9, 0.9, h);
+        for (let i = 0; i < 3; i++) d.puff(mx - 0.4 - i * 0.4, S.y + 2.2, h + 0.4 + i * 0.25, 0.22 + i * 0.1, p['gelb-30'], 0.5 - i * 0.12);
+      }
+    };
+
+    // Zeichenreihenfolge von hinten nach vorne: Boden, Rückwand, linke Wand, linke Kammer,
+    // Mittelwand, rechte Kammer, rechte Wand
+    d.rect(S.x, S.y, S.w, S.d, 0, p.concrete, p.k40);
+    d.box(S.x - 0.3, S.y - 0.3, S.w + 0.6, 0.3, S.wall, p.concrete);
+    d.box(S.x - 0.3, S.y, 0.3, S.d, S.wall, p.concrete);
+    drawChamber(0, S.x, s.maisT, p.silage, st.silo.mais.quality);
     d.box(S.x + half - 0.15, S.y, 0.3, S.d, S.wall, p.concrete);
-    d.box(S.x + S.w, S.y - 0.3, 0.3, S.d + 0.3, S.wall, p.concrete);
-    // Walzschlepper verdichtet, solange angeliefert wird
-    if (st.silo.deliveredToday > 0) {
-      const kind = st.today.deliveries.some((x) => x.kind === 'gruenroggen') ? 1 : 0;
-      const tonnes = kind ? s.ryeT : s.maisT;
-      const h = 0.25 + clamp01(tonnes / cap) * 2.4;
-      const along = (Math.sin(t * 1.4) + 1) / 2;
-      const x = S.x + kind * half + 0.6 + along * (half - 2.2);
-      this.machine(d, x, S.y + 1.6, p.dunkelgruen, 1.3, 1.0, 1.0, h);
-      for (let i = 0; i < 3; i++) d.puff(x - 0.4 - i * 0.4, S.y + 2.4, h + 0.4 + i * 0.25, 0.25 + i * 0.1, p['gelb-30'], 0.5 - i * 0.12);
-    }
+    drawChamber(1, S.x + half, s.ryeT, p.silageRye, st.silo.gruenroggen.quality);
+    d.box(S.x + S.w, S.y, 0.3, S.d, S.wall, p.concrete);
   }
 
   private drawSilo2(d: Draw): void {
@@ -596,7 +595,8 @@ export class Scene {
       const strength = clamp01(st.gas.flaredToday / 2000);
       const [sx, sy] = project(this.view, F.x, F.y, F.h);
       const c = this.ctx;
-      const sc = this.view.scale * (1.0 + strength * 1.2);
+      // Flamme klein halten: sichtbar, aber im Maßstab der Anlage
+      const sc = this.view.scale * (0.28 + strength * 0.22);
       const layers: [Rgb, number][] = [[p.danger, 1.6], [p.warning, 1.2], [p.gelb, 0.75]];
       for (const [col, size] of layers) {
         const flick = 1 + 0.15 * Math.sin(t * 17 + size * 3) + 0.1 * Math.sin(t * 29);

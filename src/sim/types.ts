@@ -287,6 +287,7 @@ export interface Unlocks {
 
 export interface ScenarioOptions {
   id: 'altanlage' | 'eigene_felder' | 'schwieriger_standort';
+  difficulty?: 'vereinfacht' | 'normal' | 'real';
   largerStorage?: boolean;
   heatLineAtStart?: boolean;
 }

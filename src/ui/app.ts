@@ -11,6 +11,7 @@ import { PANELS, panelIcon, type PanelDef } from './panels';
 import { Ticker } from './ticker';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Oberfläche: Kopfzeile mit Kalender und Zeitsteuerung, Leiste mit Entscheidungsbereichen,
@@ -61,10 +62,15 @@ export class App {
     this.game = game;
     this.dateEl = h('span', { class: 'calendar__date' });
     this.metaEl = h('span', { class: 'calendar__meta' });
-    const speeds: [number, keyof typeof ICONS, string][] = [[0, 'pause', 'Pause (Leertaste)'], [1, 'play', 'Normale Geschwindigkeit (1)'], [2, 'fast', 'Doppelte Geschwindigkeit (2)']];
+    const speeds: [number, keyof typeof ICONS, string, string][] = [
+      [0, 'pause', 'Pause', TIPS.pause],
+      [1, 'play', 'Normale Geschwindigkeit', TIPS.speed1],
+      [2, 'fast', 'Doppelte Geschwindigkeit', TIPS.speed2],
+      [4, 'faster', 'Vierfache Geschwindigkeit', TIPS.speed4],
+    ];
     const time = h('div', { class: 'time', role: 'group', 'aria-label': 'Zeit' });
-    for (const [v, icon, label] of speeds) {
-      const b = h('button', { type: 'button', class: 'time__btn', 'aria-label': label, title: label, onclick: () => this.game.setSpeed(v) }, svg(ICONS[icon])) as HTMLButtonElement;
+    for (const [v, icon, label, tip] of speeds) {
+      const b = h('button', { type: 'button', class: 'time__btn', 'aria-label': label, 'data-tip': tip, onclick: () => this.game.setSpeed(v) }, svg(ICONS[icon])) as HTMLButtonElement;
       b.dataset.speed = String(v);
       this.timeButtons.push(b);
       time.append(b);
@@ -78,14 +84,14 @@ export class App {
     this.rail = h('nav', { class: 'rail', 'aria-label': 'Entscheidungen' },
       ...PANELS.map((p) => h('button', {
         type: 'button', class: 'rail__btn', 'data-panel': p.id, 'aria-expanded': 'false', 'aria-controls': 'drawer',
-        title: `${p.title} (${p.key.toUpperCase()})`, onclick: () => this.toggle(p.id),
+        'data-tip': TIPS.rail[p.id], onclick: () => this.toggle(p.id),
       }, panelIcon(p.icon), h('span', { class: 'rail__label' }, p.title))),
     );
 
     this.drawerTitle = h('h2', { id: 'drawer-title', class: 'drawer__title' });
     this.drawerBody = h('div', { class: 'drawer__body' });
     this.drawer = h('section', { id: 'drawer', class: 'drawer', 'aria-labelledby': 'drawer-title', hidden: true },
-      h('div', { class: 'drawer__head' }, this.drawerTitle, h('button', { type: 'button', class: 'drawer__close', 'aria-label': 'Schließen (Esc)', onclick: () => this.close() }, svg(ICONS.close))),
+      h('div', { class: 'drawer__head' }, this.drawerTitle, h('button', { type: 'button', class: 'drawer__close', 'aria-label': 'Schließen', 'data-tip': TIPS.closePanel, onclick: () => this.close() }, svg(ICONS.close))),
       this.drawerBody,
     );
     this.drawerBody.addEventListener('pointerdown', (e) => {
@@ -190,7 +196,7 @@ export class App {
   }
 
   private updateTime(): void {
-    for (const b of this.timeButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === Math.min(2, this.game.speed)));
+    for (const b of this.timeButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === this.game.speed));
   }
 
   // ---------- Entscheidungsbereiche ----------
@@ -286,12 +292,12 @@ export class App {
     c.addEventListener('pointerup', end);
     c.addEventListener('pointercancel', end);
 
-    const btn = (label: string, icon: string, fn: () => void) =>
-      h('button', { type: 'button', class: 'zoom__btn', 'aria-label': label, title: label, onclick: fn }, svg(icon));
+    const btn = (label: string, icon: string, fn: () => void, tip: string) =>
+      h('button', { type: 'button', class: 'zoom__btn', 'aria-label': label, 'data-tip': tip, onclick: fn }, svg(icon));
     stage.append(h('div', { class: 'zoom', role: 'group', 'aria-label': 'Ansicht' },
-      btn('Heranzoomen (+)', ICONS.plus, () => this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP)),
-      btn('Herauszoomen (−)', ICONS.minus, () => this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP))),
-      btn('Ganze Anlage zeigen', ICONS.fit, () => this.scene.resetZoom()),
+      btn('Heranzoomen', ICONS.plus, () => this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP), TIPS.zoomIn),
+      btn('Herauszoomen', ICONS.minus, () => this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP)), TIPS.zoomOut),
+      btn('Ganze Anlage zeigen', ICONS.fit, () => this.scene.resetZoom(), TIPS.zoomFit),
     ));
   }
 
@@ -338,6 +344,7 @@ export class App {
     if (e.key === '-') this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP));
     if (e.key === '1') this.game.setSpeed(1);
     if (e.key === '2') this.game.setSpeed(2);
+    if (e.key === '3') this.game.setSpeed(4);
     if (e.key === '0') this.game.setSpeed(0);
     const p = PANELS.find((x) => x.key === e.key.toLowerCase());
     if (p) this.toggle(p.id);

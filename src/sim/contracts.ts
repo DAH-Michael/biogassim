@@ -4,6 +4,7 @@ import { logEvent } from './eventlog';
 import { round } from './biology';
 import { chance, intRange, lognormalMean1, range } from './rng';
 import { say } from './messages';
+import { difficulty } from './difficulty';
 import { hasStaff, ledger, type SiloDelivery } from './storage';
 import type { GameState } from './types';
 
@@ -146,8 +147,8 @@ export function supplyDay(state: GameState): SupplyDayResult {
       id: `r${day}`,
       tonnes: Math.round(range(r, R.lotT[0], R.lotT[1])),
       priceEurPerT,
-      quality: lognormalMean1(r, R.qualitySigma),
-      contaminated: chance(r, R.contaminantChance),
+      quality: lognormalMean1(r, R.qualitySigma * difficulty(state).residueSigmaFactor),
+      contaminated: chance(r, R.contaminantChance * difficulty(state).contaminantFactor),
       expiresDay: day + R.offerValidDays,
     });
     state.nextOfferDay = day + intRange(r, Math.ceil(R.offerIntervalDays * R.offerIntervalSpread[0]), Math.ceil(R.offerIntervalDays * R.offerIntervalSpread[1]));

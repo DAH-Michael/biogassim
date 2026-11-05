@@ -8,6 +8,7 @@ import { hasStaff } from '../sim/storage';
 import type { Action, Crop, GameState } from '../sim/types';
 import type { ActionResult } from '../sim/actions';
 import { fmt, h, svg } from './dom';
+import { TIPS } from '../content/tooltips.de';
 import { ICONS, type IconName } from './icons';
 
 /**
@@ -53,8 +54,8 @@ function statusLine(panel: string): HTMLElement {
 const section = (title: string, ...children: (Node | null | false)[]) => h('section', { class: 'panel__section' }, h('h3', {}, title), ...children);
 const row = (...children: (Node | string | null | false)[]) => h('div', { class: 'row' }, ...children);
 const kv = (k: string, v: string) => h('div', { class: 'kv' }, h('span', { class: 'kv__k' }, k), h('span', { class: 'kv__v' }, v));
-function button(label: string, onclick: () => void, opts: { primary?: boolean; disabled?: boolean; key?: string } = {}) {
-  return h('button', { type: 'button', class: opts.primary ? 'btn btn--primary' : 'btn', onclick, disabled: opts.disabled, 'data-focus': opts.key ?? label }, label);
+function button(label: string, onclick: () => void, opts: { primary?: boolean; disabled?: boolean; key?: string; tip?: string } = {}) {
+  return h('button', { type: 'button', class: opts.primary ? 'btn btn--primary' : 'btn', onclick, disabled: opts.disabled, 'data-focus': opts.key ?? label, 'data-tip': opts.tip }, label);
 }
 function numberInput(id: string, value: number, min: number, max: number, step: number, label: string) {
   return h('input', { type: 'number', id, value, min, max, step, inputmode: 'numeric', class: 'input', 'aria-label': label, 'data-focus': id });
@@ -83,7 +84,7 @@ function feedPanel(ctx: PanelCtx): HTMLElement {
     const id = `feed-${sub}`;
     const out = h('output', { for: id, class: 'slider__value' }, `${fmt.dec(target[sub], 1)} t`);
     const input = h('input', {
-      type: 'range', id, min: 0, max: CONFIG.feeding.maxPerSubstrate[sub], step: 0.5, value: target[sub], class: 'slider__input', 'data-focus': id,
+      type: 'range', id, 'data-tip': TIPS.feedSlider, min: 0, max: CONFIG.feeding.maxPerSubstrate[sub], step: 0.5, value: target[sub], class: 'slider__input', 'data-focus': id,
       'aria-valuetext': `${fmt.dec(target[sub], 1)} Tonnen pro Tag`,
     }) as HTMLInputElement;
     input.addEventListener('input', () => {
@@ -127,7 +128,7 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
         button('Abschließen', () => {
           const v = Number((document.getElementById(id) as HTMLInputElement).value);
           report('supply', ctx.act({ type: 'signSupply', offerId: o.id, tonnes: v }));
-        }, { key: `sign-${o.id}` }),
+        }, { key: `sign-${o.id}`, tip: TIPS.signSupply }),
       );
     }).filter(Boolean) as HTMLElement[];
 
@@ -141,8 +142,8 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
       h('strong', {}, g.name),
       h('span', { class: 'muted' }, `${g.distanceKm} km, bis ${g.maxTPerDay} t/Tag`),
       h('span', {}, status),
-      c ? button('Kündigen', () => report('supply', ctx.act({ type: 'cancelGuelle', supplierId: g.id })), { key: `gc-${g.id}` })
-        : button('Vertrag', () => report('supply', ctx.act({ type: 'signGuelle', supplierId: g.id })), { key: `gs-${g.id}` }),
+      c ? button('Kündigen', () => report('supply', ctx.act({ type: 'cancelGuelle', supplierId: g.id })), { key: `gc-${g.id}`, tip: TIPS.cancelGuelle })
+        : button('Vertrag', () => report('supply', ctx.act({ type: 'signGuelle', supplierId: g.id })), { key: `gs-${g.id}`, tip: TIPS.signGuelle }),
     );
   });
   const tank = s.residueTank.reduce((a, l) => a + l.tonnes, 0);
@@ -150,7 +151,7 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
     row(
       h('strong', {}, `${fmt.int(o.tonnes)} t`),
       h('span', { class: 'muted' }, `${fmt.int(o.priceEurPerT)} €/t, Angebot bis ${formatDate(o.expiresDay)}`),
-      button('Kaufen', () => report('supply', ctx.act({ type: 'buyResidue', offerId: o.id })), { key: `res-${o.id}` }),
+      button('Kaufen', () => report('supply', ctx.act({ type: 'buyResidue', offerId: o.id })), { key: `res-${o.id}`, tip: TIPS.buyResidue }),
     ),
   );
   return h('div', {},
@@ -159,7 +160,7 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
     section('Gülle', ...guelle),
     section('Mais nachkaufen',
       kv('Preis heute', `${fmt.dec(spotPrice(s), 2)} €/t`),
-      row(...[100, 300].map((t) => button(`${t} t kaufen`, () => report('supply', ctx.act({ type: 'buySpot', tonnes: t })), { key: `spot-${t}` }))),
+      row(...[100, 300].map((t) => button(`${t} t kaufen`, () => report('supply', ctx.act({ type: 'buySpot', tonnes: t })), { key: `spot-${t}`, tip: TIPS.buySpot }))),
     ),
     section('Reststoffe', kv('Vorlagebehälter', `${fmt.int(tank)} von ${fmt.int(CONFIG.plant.residueTankT)} t`), ...(residues.length ? residues : [h('p', { class: 'muted' }, 'Gerade kein Angebot.')])),
     statusLine('supply'),
@@ -176,10 +177,10 @@ function fieldsPanel(ctx: PanelCtx): HTMLElement {
     if (f.status === 'verpachtet') return h('div', { class: 'card' }, head, h('p', { class: 'muted' }, `Verpachtet bis ${formatDate(dayOfDate(CONFIG.fields.leaseAvailableFrom))}`));
     if (f.status === 'frei') {
       return h('div', { class: 'card' }, head, kv('Pacht', `${fmt.eur(cfg.ha * CONFIG.fields.leaseEurPerHa)} im Jahr`),
-        button('Pachten', () => report('fields', ctx.act({ type: 'leaseField', fieldId: f.id })), { primary: true, key: `lease-${f.id}` }));
+        button('Pachten', () => report('fields', ctx.act({ type: 'leaseField', fieldId: f.id })), { primary: true, key: `lease-${f.id}`, tip: TIPS.lease }));
     }
     const cropId = `crop-${f.id}`;
-    const select = h('select', { id: cropId, class: 'input', 'data-focus': cropId }, ...(Object.keys(CROP_NAMES) as Crop[]).map((c) => h('option', { value: c, selected: c === f.crop }, CROP_NAMES[c]))) as HTMLSelectElement;
+    const select = h('select', { id: cropId, class: 'input', 'data-focus': cropId, 'data-tip': TIPS.crop }, ...(Object.keys(CROP_NAMES) as Crop[]).map((c) => h('option', { value: c, selected: c === f.crop }, CROP_NAMES[c]))) as HTMLSelectElement;
     select.addEventListener('change', () => report('fields', ctx.act({ type: 'setCrop', fieldId: f.id, crop: select.value as Crop })));
     const standing = f.standing === 'leer' ? 'nichts' : f.standing === 'zweitmais' ? 'Mais (Zweitfrucht)' : f.standing === 'mais' ? 'Mais' : 'Grünroggen';
     const win = harvestWindowFor(f);
@@ -189,7 +190,7 @@ function fieldsPanel(ctx: PanelCtx): HTMLElement {
       const planned = f.harvestDay ?? defaultHarvestDay(s, f) ?? win.start;
       const days: number[] = [];
       for (let d = Math.max(win.start, s.day); d <= Math.min(win.end, CONFIG.time.runDays - 1); d++) days.push(d);
-      const sel = h('select', { id: hid, class: 'input', 'data-focus': hid }, ...days.map((d) => h('option', { value: d, selected: d === planned }, formatDate(d)))) as HTMLSelectElement;
+      const sel = h('select', { id: hid, class: 'input', 'data-focus': hid, 'data-tip': TIPS.harvestDay }, ...days.map((d) => h('option', { value: d, selected: d === planned }, formatDate(d)))) as HTMLSelectElement;
       sel.addEventListener('change', () => report('fields', ctx.act({ type: 'setHarvestDay', fieldId: f.id, day: Number(sel.value) })));
       harvest = h('div', { class: 'field-row' }, h('label', { for: hid }, 'Ernte ab'), days.length ? sel : h('span', {}, 'Ernte läuft'));
       if (f.harvestedHa > 0) harvest.append(h('span', { class: 'muted' }, `geerntet ${fmt.int(f.harvestedHa)} von ${cfg.ha} ha`));
@@ -218,18 +219,18 @@ function techPanel(ctx: PanelCtx): HTMLElement {
       kv('Wartungsintervall', `${fmt.int(C.serviceIntervalH)} h`),
       kv('Betriebsstunden gesamt', `${fmt.int(chp.operatingHours)} h`),
       row(
-        button(`Kleine Wartung, ${fmt.eur(s.maintenanceContract ? 0 : C.smallService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'klein' })), { key: 'svc-small' }),
-        button(`Instandsetzung, ${fmt.eur(C.majorService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'gross' })), { key: 'svc-major' }),
+        button(`Kleine Wartung, ${fmt.eur(s.maintenanceContract ? 0 : C.smallService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'klein' })), { key: 'svc-small', tip: TIPS.serviceSmall }),
+        button(`Instandsetzung, ${fmt.eur(C.majorService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'gross' })), { key: 'svc-major', tip: TIPS.serviceMajor }),
       ),
       h('p', { class: 'muted' }, `Stillstand: ${tech ? 1 : C.smallService.downtimeDays} bzw. ${tech ? Math.max(1, Math.round(C.majorService.downtimeDays * CONFIG.staff.technicianDowntimeFactor)) : C.majorService.downtimeDays} Tage`),
     ),
     section('Entschwefelung',
       kv('Vorrat Verbrauchsmittel', `etwa ${fmt.int(s.desulf.mediumDays)} Tage`),
       kv('H₂S im Gas', `${fmt.int(s.desulf.cleanPpm)} ppm`),
-      button(`Nachfüllen, ${fmt.eur(CONFIG.desulfurization.refillCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'entschwefelung' })), { key: 'svc-desulf' }),
+      button(`Nachfüllen, ${fmt.eur(CONFIG.desulfurization.refillCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'entschwefelung' })), { key: 'svc-desulf', tip: TIPS.desulf }),
     ),
     s.unlocks.includes('wartungsvertrag')
-      ? section('Wartungsvertrag', s.maintenanceContract ? h('p', {}, 'Vertrag läuft.') : button(`Abschließen, ${fmt.eur(CONFIG.maintenanceContract.eurPerMonth)} im Monat`, () => report('tech', ctx.act({ type: 'signMaintenanceContract' })), { key: 'mc' }))
+      ? section('Wartungsvertrag', s.maintenanceContract ? h('p', {}, 'Vertrag läuft.') : button(`Abschließen, ${fmt.eur(CONFIG.maintenanceContract.eurPerMonth)} im Monat`, () => report('tech', ctx.act({ type: 'signMaintenanceContract' })), { key: 'mc', tip: TIPS.maintenanceContract }))
       : null,
     statusLine('tech'),
   );
@@ -247,8 +248,8 @@ function staffPanel(ctx: PanelCtx): HTMLElement {
       h('h4', {}, ROLE_NAMES[role]),
       kv('Kosten', `${fmt.eur(cost)} im Monat`),
       status ? kv('Stand', status) : null,
-      m ? button(`Entlassen, Abfindung ${fmt.eur(cost * CONFIG.staff.severanceMonths)}`, () => report('staff', ctx.act({ type: 'fire', role })), { key: `fire-${role}` })
-        : button('Einstellen', () => report('staff', ctx.act({ type: 'hire', role })), { primary: true, key: `hire-${role}` }),
+      m ? button(`Entlassen, Abfindung ${fmt.eur(cost * CONFIG.staff.severanceMonths)}`, () => report('staff', ctx.act({ type: 'fire', role })), { key: `fire-${role}`, tip: TIPS.fire })
+        : button('Einstellen', () => report('staff', ctx.act({ type: 'hire', role })), { primary: true, key: `hire-${role}`, tip: TIPS.hire }),
     );
   });
   return h('div', {}, section('Fachleute', ...rows), statusLine('staff'));
@@ -275,11 +276,11 @@ function digestatePanel(ctx: PanelCtx): HTMLElement {
       row(
         h('label', { for: id }, 'Menge in m³'),
         numberInput(id, 1000, 0, 20000, 100, 'Menge in Kubikmetern'),
-        button('Beauftragen', () => report('dig', ctx.act({ type: 'orderSpreading', m3: Number((document.getElementById(id) as HTMLInputElement).value) })), { primary: true, key: 'spread' }),
+        button('Beauftragen', () => report('dig', ctx.act({ type: 'orderSpreading', m3: Number((document.getElementById(id) as HTMLInputElement).value) })), { primary: true, key: 'spread', tip: TIPS.spread }),
       ),
     ),
     s.unlocks.includes('abnahmevertraege')
-      ? section('Abnahmevertrag', dg.offtake ? h('p', {}, `Läuft, ${CONFIG.digestate.offtake.m3PerDay} m³ pro Tag.`) : button(`Abschließen, ${fmt.dec(CONFIG.digestate.offtake.costPerM3, 2)} €/m³`, () => report('dig', ctx.act({ type: 'signOfftake' })), { key: 'offtake' }))
+      ? section('Abnahmevertrag', dg.offtake ? h('p', {}, `Läuft, ${CONFIG.digestate.offtake.m3PerDay} m³ pro Tag.`) : button(`Abschließen, ${fmt.dec(CONFIG.digestate.offtake.costPerM3, 2)} €/m³`, () => report('dig', ctx.act({ type: 'signOfftake' })), { key: 'offtake', tip: TIPS.offtake }))
       : null,
     statusLine('dig'),
   );
@@ -300,11 +301,11 @@ function buildPanel(ctx: PanelCtx): HTMLElement {
       h('h4', {}, BUILD_NAMES[k]),
       kv('Kosten', fmt.eur(cost)),
       kv('Bauzeit', `${cfg.days} Tage`),
-      state ? kv('Stand', state) : button('Beauftragen', () => report('build', ctx.act({ type: 'build', kind: k })), { key: `build-${k}` }),
+      state ? kv('Stand', state) : button('Beauftragen', () => report('build', ctx.act({ type: 'build', kind: k })), { key: `build-${k}`, tip: `${TIPS.build[k]} ${TIPS.buildCost}` }),
     );
   });
   const dialog = s.unlocks.includes('buergerdialog')
-    ? button(`Bürgerdialog, ${fmt.eur(CONFIG.acceptance.dialogCostEur)}`, () => report('build', ctx.act({ type: 'citizenDialog' })), { key: 'dialog' })
+    ? button(`Bürgerdialog, ${fmt.eur(CONFIG.acceptance.dialogCostEur)}`, () => report('build', ctx.act({ type: 'citizenDialog' })), { key: 'dialog', tip: TIPS.dialog })
     : null;
   return h('div', {},
     section('Dorf', kv('Akzeptanz', `${fmt.int(s.acceptance.value)} von 100`), kv('Fahrten durchs Dorf heute', fmt.int(s.acceptance.trafficTrips)), dialog),

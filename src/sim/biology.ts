@@ -118,6 +118,10 @@ export interface BioInput {
   heatShare: number;
   ambientC: number;
   traceDosing: boolean;
+  /** Schwierigkeitsgrad: Faktoren auf Wechselbelastung und Wachstum, Spurenelemente aktiv */
+  shiftStressFactor?: number;
+  growthFactor?: number;
+  traceElementsActive?: boolean;
 }
 
 export interface BioOutput {
@@ -172,7 +176,7 @@ export function bioCore(bio: BiologyState, inp: BioInput): BioOutput {
   // Anpassung an die Substratzusammensetzung
   const mix = massIn > 0 ? ch4Mix(fed, inp.ch4PerT) : { ...bio.lastMix };
   const mismatch = mixDistance(bio.adaptedMix, mix);
-  bio.adaptation = 1 - B.shiftStress * mismatch;
+  bio.adaptation = 1 - B.shiftStress * (inp.shiftStressFactor ?? 1) * mismatch;
   for (const s of SUBSTRATES) bio.adaptedMix[s] += (mix[s] - bio.adaptedMix[s]) / B.adaptationTauDays;
 
   // Spurenelemente
@@ -183,7 +187,7 @@ export function bioCore(bio: BiologyState, inp: BioInput): BioOutput {
     bio.traceElements += (target - bio.traceElements) * Math.min(1, dil * B.traceElementsDilution);
   }
   if (inp.traceDosing) bio.traceElements = Math.max(bio.traceElements, B.traceElementsNeeded);
-  bio.traceFactor = B.traceElementsFloor + (1 - B.traceElementsFloor) * Math.min(1, bio.traceElements / B.traceElementsNeeded);
+  bio.traceFactor = inp.traceElementsActive === false ? 1 : B.traceElementsFloor + (1 - B.traceElementsFloor) * Math.min(1, bio.traceElements / B.traceElementsNeeded);
 
   // Methanbildung
   bio.inhibition = inhibition(bio.fosTac);
@@ -209,7 +213,7 @@ export function bioCore(bio: BiologyState, inp: BioInput): BioOutput {
   bio.demandSmoothed += (acidProd - bio.demandSmoothed) * B.demandSmoothing;
   const target = Math.min(cMax, bio.demandSmoothed * B.capacityHeadroom);
   if (bio.capacity < target) {
-    bio.capacity += Math.min(target - bio.capacity, bio.capacity * B.growthMaxPerDay * fT * bio.inhibition * bio.traceFactor);
+    bio.capacity += Math.min(target - bio.capacity, bio.capacity * B.growthMaxPerDay * (inp.growthFactor ?? 1) * fT * bio.inhibition * bio.traceFactor);
   } else {
     bio.capacity -= (bio.capacity - target) * B.decayPerDay;
   }

@@ -15,6 +15,7 @@ npm run sim -- --seed 42 --strategy ausgewogen        # ein Jahr headless, Kennz
 npm run sim -- --strategy naiv --events --messages    # mit allen Warnungen und Meldungen aus der Welt
 npm run sim -- --strategy alle --seeds 30             # Übersicht aller Strategien über viele Seeds
 npm run balance -- --seeds 50                         # Balancing-Tabelle als Markdown
+npm run balance -- --seeds 30 --difficulty real       # je Schwierigkeitsgrad
 npm run sim -- --strategy ausgewogen --scenario eigene_felder
 ```
 
@@ -22,7 +23,7 @@ Bedienung: Leiste links mit den Entscheidungsbereichen, Kennwertleiste rechts, M
 
 | Taste | Wirkung |
 |---|---|
-| Leertaste, 0, 1, 2 | Pause, normal, doppelt |
+| Leertaste, 0, 1, 2, 3 | Pause, normal (ein Jahr in etwa 20 Minuten), doppelt, vierfach |
 | F, B, A, T, P, G, U, K | Fütterung, Beschaffung, Felder (Acker), Technik, Personal, Gärrest, Ausbau und Dorf, Finanzen (Konto) |
 | Esc | Bereich schließen |
 | +, − | Szene zoomen (auch Mausrad, zwei Finger; Ziehen verschiebt) |
@@ -39,6 +40,7 @@ URL-Parameter für Abnahme und Balancing (sie überspringen das Startmenü, auß
 | `?tag=120` | springt zu Spieltag 120 |
 | `?szenario=eigene_felder` | Startszenario mit eigenen Feldern |
 | `?waerme` | Wärmeleitung ab Start |
+| `?schwierigkeit=vereinfacht` oder `real` | Schwierigkeitsgrad (Standard normal) |
 | `?speed=2`, mit `?debug` bis 50 | Geschwindigkeit |
 | `?debug` | Debug-Panel: alle internen Werte, Zeitraffer bis 50x, Sprung zu Datum (auch zurück, durch Wiederholung der Entscheidungen), Seed und Testspieler, alle Freischaltungen; Lesezugriff `window.biogas.state` |
 

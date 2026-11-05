@@ -45,6 +45,8 @@ export const MESSAGES: Record<string, Text> = {
   beschwerde_waerme: () => 'Unsere Heizung ist kalt. Wann kommt die Wärme wieder?',
   anhoerung: () => 'Uns liegen mehrere Beschwerden über Ihre Anlage vor. Wir laden Sie zu einer Anhörung ein.',
   maisdeckel: (d) => `Ihr Maisanteil liegt bei ${n(d.prozent)} Prozent. Für diesen Zeitraum können wir nur den Marktwert vergüten.`,
+  netzausfall: () => 'Im Netz gibt es eine Störung. Wir müssen Ihre Einspeisung kurz unterbrechen.',
+  ruehrwerk: (d) => `Ein Rührwerk ist ausgefallen. Bis es repariert ist, bekomme ich nur die Hälfte rein. Etwa ${n(d.tage)} Tage.`,
   kreditrahmen: () => 'Ihr Kontokorrent ist fast ausgeschöpft. Wir beobachten das.',
 };
 

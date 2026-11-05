@@ -4,6 +4,7 @@ import { createEventLog, logEvent } from './eventlog';
 import { createBiology, round, warmUpBiology, zeroMap } from './biology';
 import { deriveRng, intRange } from './rng';
 import { generateWeather } from './weather';
+import { difficulty } from './difficulty';
 import type { FieldState, GameState, ScenarioOptions } from './types';
 
 /**
@@ -13,7 +14,7 @@ import type { FieldState, GameState, ScenarioOptions } from './types';
  */
 export function createGame(seed: number, scenario: ScenarioOptions = { id: 'altanlage' }, unlocks: string[] = []): GameState {
   const sc = CONFIG.scenarios[scenario.id];
-  const weather = generateWeather(seed);
+  const weather = generateWeather(seed, difficulty({ scenario }).droughtChance);
   const log = createEventLog();
   const rngFields = deriveRng(seed, 'fields');
 

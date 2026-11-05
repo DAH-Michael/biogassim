@@ -299,6 +299,7 @@ g[tabindex]:focus .marker { stroke: var(--dunkelgruen); stroke-width: 3; }
 .menu__section:last-child { border-bottom: 0; }
 .menu__section h3, .progress h3 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-weight: 700; font-size: 22px; }
 .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2); }
+.choices--3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .choice { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-xs); cursor: pointer; }
 .choice:has(input:checked) { border: 2px solid var(--dunkelgruen); background: var(--cream); padding: calc(var(--space-3) - 1px); }
 .choice input, .check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--dunkelgruen); flex: none; }
@@ -317,6 +318,10 @@ input.code__input { width: 9.5em; }
 .code__status { font-size: 13px; color: var(--k80); }
 .code__msg { min-height: 1.4em; margin: var(--space-1) 0 0; font-size: 14px; }
 .code__msg[data-state='error'] { color: var(--danger); font-weight: 600; }
+
+/* Tooltips */
+.tip { position: fixed; z-index: 30; max-width: min(320px, calc(100vw - 16px)); padding: var(--space-2) var(--space-3); background: var(--ink-forest); color: var(--cream); border-radius: var(--radius-xs); box-shadow: var(--shadow-md); font-size: 13px; line-height: 1.45; pointer-events: none; }
+.tip[hidden] { display: none; }
 
 /* Debug-Panel (nur mit ?debug) */
 .debug { position: fixed; top: 64px; right: var(--space-2); bottom: var(--space-2); width: 340px; display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--k40); border-radius: var(--radius-xs); box-shadow: var(--shadow-lg); z-index: 20; font-size: 12px; }

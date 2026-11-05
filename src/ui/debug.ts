@@ -38,7 +38,7 @@ function values(s: GameState): [string, [string, string][]][] {
   return [
     ['Allgemein', [
       ['Seed', String(s.seed)], ['Spieltag', `${s.day} (${formatDate(Math.max(0, s.day - 1))})`], ['Dürrejahr', s.weather.drought ? 'ja' : 'nein'],
-      ['Szenario', s.scenario.id], ['Ereignisse', fmt.int(s.log.events.length)],
+      ['Szenario', `${s.scenario.id}, ${s.scenario.difficulty ?? 'normal'}`], ['Ereignisse', fmt.int(s.log.events.length)],
     ]],
     ['Biologie (wahr)', [
       ['FOS/TAC wahr', n2(b.fosTac)], ['FOS/TAC gemessen', n2(s.measurement.fosTac)], ['Säurestau m³ CH4', fmt.int(b.acids)],

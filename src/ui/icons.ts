@@ -8,6 +8,7 @@ const icon = (body: string) =>
 export const ICONS = {
   pause: icon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
   play: icon('<path d="M7 4l12 8-12 8z"/>'),
+  faster: icon('<path d="M2 6l6 6-6 6z"/><path d="M9 6l6 6-6 6z"/><path d="M16 6l6 6-6 6z"/>'),
   fast: icon('<path d="M3 5l9 7-9 7z"/><path d="M12 5l9 7-9 7z"/>'),
   feed: icon('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'),
   truck: icon('<path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>'),

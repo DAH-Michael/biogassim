@@ -3,6 +3,7 @@ import { formatDate } from '../sim/calendar';
 import { messageText, SENDERS } from '../content/messages.de';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Meldungen aus der Welt: höchstens eine gleichzeitig sichtbar, ignorierbar.
@@ -25,7 +26,7 @@ export class Ticker {
     this.sender = h('strong', { class: 'ticker__sender' });
     this.date = h('span', { class: 'ticker__date' });
     this.body = h('p', { class: 'ticker__text' });
-    const close = h('button', { type: 'button', class: 'ticker__close', 'aria-label': 'Meldung schließen', onclick: () => this.next() }, svg(ICONS.close));
+    const close = h('button', { type: 'button', class: 'ticker__close', 'aria-label': 'Meldung schließen', 'data-tip': TIPS.closeMessage, onclick: () => this.next() }, svg(ICONS.close));
     this.el = h('div', { class: 'ticker', role: 'status', 'aria-live': 'polite', hidden: true },
       h('span', { class: 'ticker__icon' }, svg(ICONS.message)),
       h('div', { class: 'ticker__content' }, h('div', { class: 'ticker__head' }, this.sender, this.date), this.body),

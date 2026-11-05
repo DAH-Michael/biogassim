@@ -3,6 +3,7 @@ import { decodeSaveCode } from '../meta/savecode';
 import { flagsToKeys } from '../meta/unlocks.config';
 import type { ScenarioOptions } from '../sim/types';
 import { h } from './dom';
+import { TIPS } from '../content/tooltips.de';
 import { saveCodeView } from './savecodeView';
 import { codeForKeys } from '../meta/progression';
 
@@ -14,12 +15,32 @@ export interface MenuOptions {
   unlocks: string[];
   onUnlocks: (keys: string[]) => void;
   onStart: (scenario: ScenarioOptions) => void;
+  /** zuletzt gewählter Schwierigkeitsgrad */
+  difficulty?: ScenarioOptions['difficulty'];
 }
 
 const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs?: string }[] = [
   { id: 'altanlage', title: 'Altanlage', text: 'Der Vorbesitzer hat sich zur Ruhe gesetzt. Die Anlage läuft, ist aber in die Jahre gekommen. Seine Felder sind noch bis Mitte Oktober verpachtet.' },
   { id: 'eigene_felder', title: 'Mit eigenen Feldern', text: 'Dieselbe Anlage, aber die drei Felder gehören zum Betrieb. Der Mais steht kurz vor der Ernte.', needs: 'eigene_felder' },
   { id: 'schwieriger_standort', title: 'Schwieriger Standort', text: 'Weniger Tierhaltung in der Nähe, längere Wege für Gülle, und das Dorf liegt direkt an der Zufahrt.', needs: 'schwieriger_standort' },
+];
+
+const LEVELS: { id: NonNullable<ScenarioOptions['difficulty']>; title: string; text: string; tip: string }[] = [
+  {
+    id: 'vereinfacht', title: 'Vereinfacht',
+    text: 'Die Biologie verzeiht mehr, der Laborwert kommt täglich, die Technik läuft ohne Zufallsstörungen.',
+    tip: 'Ohne Spurenelemente, Futterwechsel-Stress, zufällige BHKW-Störungen, Verbrauchsmittel der Entschwefelung, Verdichtungsverluste, Störstoffe und Dürre. Sperrfrist und Maisdeckel gelten.',
+  },
+  {
+    id: 'normal', title: 'Normal',
+    text: 'Alle Zusammenhänge der Anlage, so wie sie im Spiel gedacht sind.',
+    tip: 'Biologie mit Spurenelementen und Anpassungszeit, wöchentlicher Laborwert, Verschleiß und Störungen, Silageverluste, Reststoffe mit Risiko, gelegentlich Dürre.',
+  },
+  {
+    id: 'real', title: 'Real',
+    text: 'Empfindlichere Biologie, Laborwerte mit mehr Verzug, mehr Störungen bis hin zu Netzausfällen.',
+    tip: 'Methanbildner wachsen langsamer, Futterwechsel belasten stärker, Laborwert nach fünf Tagen, mehr BHKW-Störungen, Netzausfälle, Rührwerksstörungen, häufiger Dürre, stärker schwankende Reststoffe.',
+  },
 ];
 
 const REASONS: Record<string, string> = {
@@ -31,6 +52,7 @@ const REASONS: Record<string, string> = {
 
 export function buildMenu(o: MenuOptions): HTMLElement {
   let scenario: ScenarioOptions['id'] = 'altanlage';
+  let level: NonNullable<ScenarioOptions['difficulty']> = o.difficulty ?? 'normal';
   let largerStorage = false;
   let heatLine = false;
 
@@ -42,6 +64,15 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       const input = h('input', { type: 'radio', name: 'scenario', id, value: sc.id, checked: i === 0 }) as HTMLInputElement;
       input.addEventListener('change', () => { scenario = sc.id; });
       return h('label', { class: 'choice', for: id }, input, h('span', { class: 'choice__body' }, h('strong', {}, sc.title), h('span', {}, sc.text)));
+    }),
+  );
+
+  const levelList = h('div', { class: 'choices choices--3', role: 'radiogroup', 'aria-label': 'Schwierigkeit' },
+    ...LEVELS.map((lv) => {
+      const id = `lv-${lv.id}`;
+      const input = h('input', { type: 'radio', name: 'level', id, value: lv.id, checked: lv.id === level }) as HTMLInputElement;
+      input.addEventListener('change', () => { level = lv.id; });
+      return h('label', { class: 'choice', for: id, 'data-tip': lv.tip }, input, h('span', { class: 'choice__body' }, h('strong', {}, lv.title), h('span', {}, lv.text)));
     }),
   );
 
@@ -82,7 +113,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
   const codeSection = h('section', { class: 'menu__section' },
     h('h3', {}, 'Speichercode'),
     h('label', { for: 'code-in', class: 'field-label' }, 'Code vom letzten Mal'),
-    h('div', { class: 'row' }, codeInput, h('button', { type: 'button', class: 'btn', onclick: apply }, 'Übernehmen')),
+    h('div', { class: 'row' }, codeInput, h('button', { type: 'button', class: 'btn', 'data-tip': TIPS.applyCode, onclick: apply }, 'Übernehmen')),
     codeMsg,
     unlocked.length ? h('div', {}, h('p', { class: 'field-label' }, 'Ihr aktueller Code'), saveCodeView(codeForKeys(o.unlocks))) : null,
   );
@@ -90,7 +121,8 @@ export function buildMenu(o: MenuOptions): HTMLElement {
   const start = h('button', {
     type: 'button',
     class: 'btn btn--primary btn--large',
-    onclick: () => o.onStart({ id: scenario, largerStorage, heatLineAtStart: heatLine }),
+    'data-tip': TIPS.start,
+    onclick: () => o.onStart({ id: scenario, difficulty: level, largerStorage, heatLineAtStart: heatLine }),
   }, 'Anlage übernehmen');
 
   return h('div', { class: 'menu' },
@@ -101,6 +133,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       start,
     ),
     h('section', { class: 'menu__section' }, h('h3', {}, 'Startszenario'), scenarioList, ...options),
+    h('section', { class: 'menu__section' }, h('h3', {}, 'Schwierigkeit'), levelList),
     knowledge,
     codeSection,
   );

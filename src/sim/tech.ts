@@ -4,6 +4,7 @@ import { round } from './biology';
 import { chance, intRange, range } from './rng';
 import { say } from './messages';
 import { hasStaff, ledger } from './storage';
+import { difficulty } from './difficulty';
 import type { GameState } from './types';
 
 /**
@@ -53,7 +54,7 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
   desulf.rawPpm = rawUnits * DS.rawPpmPerUnit;
   const loadRel = (ch4ProducedM3 / chpCh4PerDay()) * rawUnits;
   if (desulf.mediumDays > 0) {
-    desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
+    if (difficulty(state).desulfConsumable) desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
     desulf.cleanPpm = desulf.rawPpm * DS.withMediumResidual;
   } else {
     desulf.cleanPpm = desulf.rawPpm * (1 - DS.biologicalRemoval);
@@ -140,6 +141,7 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
     let p = C.failureBasePerDay * (1 + C.failureOverdueFactor * overdue) * (1 + C.failureWearFactor * Math.max(0, chp.wear - C.failureWearThreshold)) * Math.sqrt(h2sMult);
     if (hasStaff(state, 'techniker')) p *= CONFIG.staff.technicianFailureFactor;
     if (state.maintenanceContract) p *= CONFIG.maintenanceContract.failureFactor;
+    p *= difficulty(state).chpFailureFactor;
     if (chance(state.rng.tech, p)) {
       let days = intRange(state.rng.tech, C.failureDowntimeDays[0], C.failureDowntimeDays[1]);
       if (hasStaff(state, 'techniker')) days = Math.max(1, Math.round(days * CONFIG.staff.technicianDowntimeFactor));
@@ -160,6 +162,15 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
       addCause(state.finance.lossCauses, ev.id, cost);
       say(state, 'betriebsleiter', 'bhkw_stoerung', { tage: days }, ev.id);
     }
+  }
+
+  // Netzausfall (Stufe Real): das BHKW darf nicht einspeisen und schaltet ab
+  if (chp.status === 'betrieb' && chance(state.rng.tech, difficulty(state).gridOutagePerDay)) {
+    const ev = logEvent(log, day, { type: 'grid_outage', severity: 'warning', causes: [], data: { days: CONFIG.realEvents.gridOutageDays } });
+    chp.status = 'stoerung';
+    chp.downUntilDay = day + CONFIG.realEvents.gridOutageDays;
+    chp.downEvent = ev.id;
+    say(state, 'netzbetreiber', 'netzausfall', {}, ev.id);
   }
 
   // Totalschaden

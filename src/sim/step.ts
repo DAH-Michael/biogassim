@@ -11,6 +11,7 @@ import { acceptanceDay } from './acceptance';
 import { financeDay, settleMonth, villageHeatDemandKwh } from './finance';
 import { measurementDay } from './measurement';
 import { checkFailure } from './failure';
+import { difficulty } from './difficulty';
 import { say } from './messages';
 import type { Action, GameState } from './types';
 
@@ -67,6 +68,9 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
     heatShare: state.chp.runShare,
     ambientC: weather.tempC,
     traceDosing: state.rampFeed !== null,
+    shiftStressFactor: difficulty(state).shiftStressFactor,
+    growthFactor: difficulty(state).growthFactor,
+    traceElementsActive: difficulty(state).traceElements,
   }, feed.changeCause, feed.residueEvent);
 
   // Gärrestlager (aufgefangenes Restgas geht in den Gasspeicher)
