@@ -1,0 +1,23 @@
+{
+  "name": "dah-biogas-prototyp",
+  "version": "0.1.0",
+  "description": "Prototyp Biogas-Browserspiel der DAH Gruppe",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "sim": "tsx tools/simulate.ts",
+    "typecheck": "tsc --noEmit",
+    "tokens": "tsx tools/build-tokens.ts",
+    "balance": "tsx tools/balance.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  },
+  "private": true,
+  "type": "module"
+}
