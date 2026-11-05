@@ -680,6 +680,33 @@ export const CONFIG = {
     bankNoticeShare: 0.8,
   },
 
+  /**
+   * Warnfarben der Kennwertleiste: ab wann ein Wert als bedenklich (warn) oder kritisch (crit)
+   * angezeigt wird. Nur Anzeige, keine Spielbalance. Richtwert, fachlich prüfen
+   */
+  metricWarnings: {
+    /** Gasproduktion als Anteil des Bedarfs für Volllast */
+    gasShareWarn: 0.8,
+    gasShareCrit: 0.55,
+    /** FOS/TAC: warn etwas unter der Warnschwelle der Biologie, kritisch ab der Warnschwelle */
+    fosTacWarn: 0.42,
+    /** Fermentertemperatur: warn unter dem Optimum, kritisch ab der Kältemeldung */
+    tempWarnC: 37,
+    tempCritC: 36,
+    /** Gasspeicher: fast voll heißt bald Fackel, fast leer heißt BHKW drosselt */
+    storeHighWarn: 0.9,
+    storeLowWarn: 0.1,
+    /** Silovorrat in Tagen bei aktueller Fütterung */
+    siloDaysWarn: 21,
+    siloDaysCrit: 7,
+    /** Gärrestlager */
+    digestateWarn: 0.7,
+    /** Kontostand: warn unter null, kritisch ab der Bankmeldung */
+    balanceWarnEur: 0,
+    /** Akzeptanz: warn unter diesem Wert, kritisch unter acceptance.warningLevel */
+    acceptanceWarn: 40,
+  },
+
   /** Maisdeckel: Höchstanteil Mais an der Inputmasse. OFFENER PUNKT: aktuelle EEG-Regelung klären. Richtwert, fachlich prüfen */
   maizeCap: {
     maxShare: 0.40,

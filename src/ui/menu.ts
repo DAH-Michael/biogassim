@@ -19,6 +19,8 @@ export interface MenuOptions {
   /** zuletzt gewählter Schwierigkeitsgrad */
   difficulty?: ScenarioOptions['difficulty'];
   tutorial?: boolean;
+  /** zuletzt gewählter Anlagenname (nur im Speicher) */
+  plantName?: string;
 }
 
 const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs?: string }[] = [
@@ -52,12 +54,29 @@ const REASONS: Record<string, string> = {
   version: 'Dieser Code stammt aus einer anderen Version des Spiels.',
 };
 
+const PLANT_NAME_MAX = 40;
+
+/** Name säubern: Steuerzeichen raus, Leerraum zusammenfassen, Länge begrenzen. Leer wird zu undefined. */
+export function cleanPlantName(raw: string): string | undefined {
+  const s = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, PLANT_NAME_MAX);
+  return s || undefined;
+}
+
 export function buildMenu(o: MenuOptions): HTMLElement {
   let scenario: ScenarioOptions['id'] = 'altanlage';
   let level: NonNullable<ScenarioOptions['difficulty']> = o.difficulty ?? 'normal';
   let tutorial = o.tutorial ?? false;
   let largerStorage = false;
   let heatLine = false;
+
+  // Name der Anlage: nur für diesen Durchlauf, nicht im Speichercode
+  const nameInput = h('input', { type: 'text', id: 'plant-name', class: 'input', maxlength: PLANT_NAME_MAX, autocomplete: 'off', spellcheck: 'false', placeholder: 'z. B. Biogas Lindenhof', value: o.plantName ?? '' }) as HTMLInputElement;
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') (document.querySelector('.menu .btn--primary') as HTMLElement | null)?.click(); });
+  const nameField = h('div', { class: 'menu__name' },
+    h('label', { for: 'plant-name', class: 'field-label' }, 'Name Ihrer Anlage (freiwillig)'),
+    nameInput,
+    h('p', { class: 'muted' }, 'Erscheint oben in der Leiste und auf dem Ergebnis. Der Name wird nirgends gespeichert und ist nach dem Schließen der Seite weg.'),
+  );
 
   const has = (k: string) => o.unlocks.includes(k);
 
@@ -134,7 +153,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
     type: 'button',
     class: 'btn btn--primary btn--large',
     'data-tip': TIPS.start,
-    onclick: () => o.onStart({ id: scenario, difficulty: level, tutorial, largerStorage, heatLineAtStart: heatLine }),
+    onclick: () => o.onStart({ id: scenario, difficulty: level, tutorial, largerStorage, heatLineAtStart: heatLine, plantName: cleanPlantName(nameInput.value) }),
   }, 'Anlage übernehmen');
 
   return h('div', { class: 'menu' },
@@ -142,6 +161,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       h('p', { class: 'eyebrow' }, 'Ein Jahr auf der Biogasanlage'),
       h('h2', { id: 'end-title' }, 'Biogas-Anlage'),
       h('p', { class: 'analysis__sentence' }, 'Am 1. August übernehmen Sie eine Biogasanlage mit 500 Kilowatt. Bis zum 31. Juli führen Sie den Betrieb.'),
+      nameField,
       start,
     ),
     h('section', { class: 'menu__section' }, h('h3', {}, 'Startszenario'), scenarioList, ...options),

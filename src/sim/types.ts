@@ -293,6 +293,8 @@ export interface ScenarioOptions {
   tutorial?: boolean;
   largerStorage?: boolean;
   heatLineAtStart?: boolean;
+  /** Selbst gewählter Name der Anlage: nur Anzeige in diesem Durchlauf, wird nirgends gespeichert */
+  plantName?: string;
 }
 
 export interface GameState {

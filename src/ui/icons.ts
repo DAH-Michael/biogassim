@@ -25,6 +25,16 @@ export const ICONS = {
   plus: icon('<path d="M12 5v14M5 12h14"/>'),
   minus: icon('<path d="M5 12h14"/>'),
   fit: icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+  flame: icon('<path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 1.5 1 2.5 2.5 2.5 4.5C13 9 12 6 12 3z"/>'),
+  flask: icon('<path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>'),
+  thermo: icon('<path d="M10 4a2 2 0 0 1 4 0v10a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>'),
+  dome: icon('<path d="M3 19h18"/><path d="M4 19v-5a8 8 0 0 1 16 0v5"/><path d="M8 12a4 4 0 0 1 4-3"/>'),
+  silo: icon('<path d="M2 20h20"/><path d="M4 20V9l8-4 8 4v11"/><path d="M8 20v-6h8v6"/>'),
+  tank: icon('<ellipse cx="12" cy="6" rx="8" ry="2.5"/><path d="M4 6v12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5V6"/><path d="M4 12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5"/>'),
+  euro: icon('<path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/>'),
+  heart: icon('<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'),
+  chart: icon('<path d="M4 4v16h16"/><path d="M7 15l4-5 3 3 5-7"/>'),
+  alert: icon('<path d="M12 3l10 18H2z"/><path d="M12 10v5"/><path d="M12 18v.5"/>'),
   message: icon('<path d="M4 5h16v11H8l-4 4z"/>'),
 };
 export type IconName = keyof typeof ICONS;

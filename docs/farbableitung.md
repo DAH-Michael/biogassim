@@ -35,3 +35,13 @@ Nur durch Mischen von Designsystem-Farben, ohne neue Farbtöne:
 | Asphalt, Beton, Folie | `k40`, `k20`, `k80` | Straßen, Behälter, Silofolie |
 
 Jahreszeiten mischen `hellgruen-15/30/50`, `gelb-30` und `k10` für den Boden; Dürre verschiebt Boden und Felder Richtung `gelb-30` bzw. `gelb-50`, Frost Richtung `white`; Regen trübt den Himmel (`blau-15` mit `k20`).
+
+## Warnstufen der Kennwertleiste
+
+Die Kennwerte rechts färben sich, wenn sie in einen bedenklichen Bereich laufen. Schwellen stehen in `CONFIG.metricWarnings`.
+
+| Stufe | Rand und Symbolkreis | Fläche | Zusätzliches Merkmal |
+|---|---|---|---|
+| ok | `dunkelgruen` | `white`, Symbolkreis `dunkelgruen-15` | keins |
+| Achtung | `warning` | `warning-soft` | Warndreieck |
+| kritisch | `danger` | 10 % `danger` auf `white` (abgeleitet, `danger-soft` fehlt im Designsystem) | Warndreieck, pulsiert ohne `prefers-reduced-motion` |

@@ -33,7 +33,7 @@ export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement 
   const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', 'data-tip': TIPS.restart, onclick: opts.onRestart }, 'Neuer Versuch');
 
   const head = h('header', { class: 'analysis__head' },
-    h('p', { class: 'eyebrow' }, `${failed ? 'Durchlauf beendet' : 'Jahresbilanz'}, Stufe ${LEVEL_NAMES[s.scenario.difficulty ?? 'normal']}`),
+    h('p', { class: 'eyebrow' }, `${s.scenario.plantName ? `${s.scenario.plantName}: ` : ''}${failed ? 'Durchlauf beendet' : 'Jahresbilanz'}, Stufe ${LEVEL_NAMES[s.scenario.difficulty ?? 'normal']}`),
     h('h2', { id: 'end-title' }, failed ? FAILURE_TITLES[s.failure!.kind] : tierName(y.tier)),
     h('p', { class: 'analysis__sentence' }, outcomeSentence(s)),
     h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', 'data-tip': TIPS.toMenu, onclick: opts.onMenu }, 'Zum Startmenü') : null),
@@ -68,6 +68,7 @@ function scoreCard(s: GameState, best: number | null): HTMLElement {
   ].filter(Boolean) as string[];
   const isBest = !failed && best !== null && Math.round(s.finance.balance) >= Math.round(best);
   return h('section', { class: `score${failed ? ' score--failed' : ''}`, 'aria-label': 'Ergebnis' },
+    s.scenario.plantName ? h('p', { class: 'score__name' }, s.scenario.plantName) : null,
     h('div', { class: 'score__main' },
       h('p', { class: 'score__label' }, failed ? `Kontostand beim Scheitern am ${formatDate(s.failure!.day)}` : 'Kontostand am 31. Juli'),
       h('p', { class: 'score__value' }, fmt.eur(s.finance.balance)),

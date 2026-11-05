@@ -24,6 +24,7 @@ export const TIPS = {
   } as Record<string, string>,
 
   closePanel: 'Schließt diesen Bereich. (Esc)',
+  stats: 'Zeigt Kennzahlen und Verläufe seit dem 1. August bis heute. Das Spiel pausiert so lange. (V)',
   closeMessage: 'Blendet die Meldung aus. Sie hat keine weitere Wirkung.',
   zoomIn: 'Vergrößert die Ansicht. Mit der Maus ziehen verschiebt sie. (Taste +)',
   zoomOut: 'Verkleinert die Ansicht. (Taste −)',

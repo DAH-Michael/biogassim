@@ -12,6 +12,7 @@ import { Ticker } from './ticker';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
 import { Advisor } from './advisor';
+import { buildStats } from './stats';
 import logoUrl from '../assets/logos/dah-logo-horizontal-farbig.svg?url';
 import { TIPS } from '../content/tooltips.de';
 
@@ -55,7 +56,11 @@ const DRAG_THRESHOLD = 6;
 export class App {
   private game: GameController;
   private scene: Scene;
-  private metrics = new MetricsBar();
+  private metrics = new MetricsBar((id) => this.openStats(id));
+  private statsOverlay: HTMLElement;
+  /** Tempo vor dem Öffnen des Verlaufs */
+  private statsResume = 0;
+  private brandEl: HTMLElement;
   private ticker = new Ticker();
   private drawer: HTMLElement;
   private drawerTitle: HTMLElement;
@@ -88,10 +93,12 @@ export class App {
       this.timeButtons.push(b);
       time.append(b);
     }
+    this.brandEl = h('div', { class: 'brand' }, 'Biogas-Anlage');
+    const statsBtn = h('button', { type: 'button', class: 'stats-btn', 'data-tip': TIPS.stats, onclick: () => this.openStats() }, svg(ICONS.chart), h('span', { class: 'stats-btn__label' }, 'Verlauf'));
     const header = h('header', { class: 'topbar' },
-      h('div', { class: 'brand' }, 'Biogas-Anlage'),
+      this.brandEl,
       h('div', { class: 'calendar', 'aria-live': 'polite' }, this.dateEl, this.metaEl),
-      time,
+      h('div', { class: 'topbar__right' }, statsBtn, time),
     );
 
     this.rail = h('nav', { class: 'rail', 'aria-label': 'Entscheidungen' },
@@ -119,6 +126,7 @@ export class App {
 
     this.canvas = h('canvas', { id: 'scene', 'aria-label': 'Ansicht der Biogasanlage mit Feldern und Dorf. Objekte lassen sich antippen.' }) as HTMLCanvasElement;
     this.endOverlay = h('div', { class: 'end', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'end-title' });
+    this.statsOverlay = h('div', { class: 'end end--stats', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'stats-title' });
     this.advisor = new Advisor({
       getSpeed: () => this.game.speed,
       setSpeed: (v) => this.game.setSpeed(v),
@@ -126,7 +134,7 @@ export class App {
     });
     // Großes Pausesymbol über der entsättigten Szene; Klicks gehen hindurch
     const pauseMark = h('div', { class: 'pause-mark', 'aria-hidden': 'true' }, svg('<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="58" class="pause-mark__disc"/><rect x="38" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/><rect x="67" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/></svg>'));
-    const stage = h('main', { class: 'stage' }, this.canvas, pauseMark, this.drawer, this.ticker.el, this.advisor.el, this.endOverlay);
+    const stage = h('main', { class: 'stage' }, this.canvas, pauseMark, this.drawer, this.ticker.el, this.advisor.el, this.statsOverlay, this.endOverlay);
     this.stage = stage;
     // Absender unten rechts im Weißraum der Kennwertleiste
     this.metrics.el.append(h('a', { class: 'powered', href: 'https://www.dah-gruppe.de', target: '_blank', rel: 'noopener', 'data-tip': 'Zur Website der DAH Gruppe (öffnet in neuem Fenster).' },
@@ -162,7 +170,11 @@ export class App {
 
   attach(game: GameController): void {
     this.game = game;
+    this.closeStats(false);
     this.hideOverlay();
+    const name = game.state.scenario.plantName;
+    this.brandEl.textContent = name ?? 'Biogas-Anlage';
+    this.brandEl.title = name ?? '';
     this.ticker.clear(0);
     if (this.attached.has(game)) {
       this.refresh();
@@ -237,7 +249,7 @@ export class App {
   /** Pause deutlich zeigen: nur im laufenden Spiel, nicht unter Startmenü oder Analyse. */
   private updatePause(): void {
     if (!this.stage) return;
-    const paused = this.game.speed === 0 && !this.game.over && this.endOverlay.hidden;
+    const paused = this.game.speed === 0 && !this.game.over && this.endOverlay.hidden && this.statsOverlay.hidden;
     this.stage.classList.toggle('is-paused', paused);
   }
 
@@ -386,12 +398,19 @@ export class App {
     // Tastenkürzel gelten überall außer beim Tippen in Text- und Zahlenfelder und in Auswahllisten
     const typing = (t instanceof HTMLInputElement && t.type !== 'range') || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement;
     if (e.key === 'Escape') {
-      if (this.openPanel) this.close();
+      if (!this.statsOverlay.hidden) this.closeStats();
+      else if (this.openPanel) this.close();
       return;
     }
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     // Solange Startmenü oder Analyse offen sind, gelten die Spieltasten nicht
     if (!this.endOverlay.hidden) return;
+    if (e.key.toLowerCase() === 'v') {
+      if (this.statsOverlay.hidden) this.openStats();
+      else this.closeStats();
+      return;
+    }
+    if (!this.statsOverlay.hidden) return;
     if (e.key === ' ') {
       if (t instanceof HTMLButtonElement) return;
       this.game.setSpeed(this.game.speed === 0 ? 1 : 0);
@@ -419,6 +438,32 @@ export class App {
     this.showOverlay(view);
   }
 
+  // ---------- Verlauf während des Spiels ----------
+
+  /** Verlauf bisher öffnen; das Spiel pausiert, bis die Ansicht geschlossen wird. */
+  openStats(focus?: string): void {
+    if (this.game.over || !this.endOverlay.hidden) return;
+    if (this.statsOverlay.hidden) this.statsResume = this.game.speed;
+    this.game.setSpeed(0);
+    this.close();
+    const view = buildStats(this.game.state, { plantName: this.game.state.scenario.plantName ?? null, onClose: () => this.closeStats(), focus });
+    this.statsOverlay.replaceChildren(h('div', { class: 'end__card' }, view));
+    this.statsOverlay.hidden = false;
+    if (!focus) this.statsOverlay.scrollTop = 0;
+    this.setBackgroundInert(true);
+    (this.statsOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus({ preventScroll: true });
+    this.updatePause();
+  }
+
+  closeStats(resume = true): void {
+    if (this.statsOverlay.hidden) return;
+    this.statsOverlay.hidden = true;
+    this.statsOverlay.replaceChildren();
+    this.setBackgroundInert(false);
+    if (resume && !this.game.over) this.game.setSpeed(this.statsResume);
+    this.updatePause();
+  }
+
   /** Startmenü oder Analyse über der Spielfläche zeigen. */
   showOverlay(content: HTMLElement): void {
     this.close();
@@ -438,7 +483,7 @@ export class App {
   }
 
   private setBackgroundInert(on: boolean): void {
-    for (const el of [this.rail, this.timeButtons[0]?.parentElement]) {
+    for (const el of [this.rail, this.timeButtons[0]?.parentElement?.parentElement, this.metrics.el]) {
       if (!el) continue;
       if (on) el.setAttribute('inert', '');
       else el.removeAttribute('inert');

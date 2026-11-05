@@ -20,6 +20,8 @@ export class Tooltips {
   constructor() {
     this.el = h('div', { class: 'tip', role: 'tooltip', id: 'tooltip', hidden: true });
     document.body.append(this.el);
+    // Kennwerte ändern ihren Tooltip täglich; sichtbaren Text nachziehen
+    new MutationObserver(() => this.refresh()).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-tip'] });
 
     document.addEventListener('pointerover', (e) => {
       if ((e as PointerEvent).pointerType === 'touch') return;
@@ -103,8 +105,18 @@ export class Tooltips {
       left = r.right + GAP;
       top = Math.max(GAP, Math.min(vh - tip.height - GAP, r.top + r.height / 2 - tip.height / 2));
     }
+    // Kennwertleiste rechts: Tooltip links daneben
+    if (t.closest('.metrics')) {
+      left = Math.max(GAP, r.left - tip.width - GAP);
+      top = Math.max(GAP, Math.min(vh - tip.height - GAP, r.top + r.height / 2 - tip.height / 2));
+    }
     this.el.style.left = `${left}px`;
     this.el.style.top = `${top}px`;
+  }
+
+  /** Text des sichtbaren Tooltips nachziehen, wenn sich data-tip geändert hat. */
+  refresh(): void {
+    if (this.target && !this.el.hidden && this.target.dataset.tip !== this.el.textContent) this.show(this.target);
   }
 
   hide(): void {
