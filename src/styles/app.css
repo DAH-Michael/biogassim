@@ -1,0 +1,73 @@
+@import './tokens.css';
+@import './fonts.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg-muted);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  overflow: hidden;
+}
+
+.app { display: flex; flex-direction: column; height: 100dvh; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 22px;
+  text-transform: uppercase;
+  color: var(--dunkelgruen);
+  letter-spacing: 0.01em;
+}
+.calendar { display: flex; flex-direction: column; line-height: 1.2; margin-right: auto; }
+.calendar__date { font-family: var(--font-display); font-weight: 700; font-size: 20px; }
+.calendar__meta { font-size: 13px; color: var(--k80); }
+
+.time { display: flex; gap: var(--space-1); }
+.time__btn {
+  min-width: 44px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--white);
+  color: var(--dunkelgruen);
+  font-size: 14px;
+  cursor: pointer;
+}
+.time__btn[aria-pressed='true'] { background: var(--dunkelgruen); color: var(--cream); border-color: var(--dunkelgruen); }
+.time__btn:focus-visible { outline: 3px solid var(--dunkelgruen); outline-offset: 2px; box-shadow: 0 0 0 2px var(--white); }
+
+.stage { position: relative; flex: 1; min-height: 0; }
+#scene { display: block; width: 100%; height: 100%; touch-action: manipulation; }
+
+.rotate { display: none; }
+@media (orientation: portrait) and (max-width: 900px) {
+  .rotate {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8);
+    background: var(--dunkelgruen);
+    color: var(--cream);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

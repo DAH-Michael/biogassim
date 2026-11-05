@@ -347,6 +347,8 @@ export interface GameState {
   /** Spielerentscheidungen mit Tag, für Wiederholung und Analyse */
   actionLog: { day: number; action: Action }[];
   noticeFlags: Record<string, boolean>;
+  /** Logistik des letzten Tages, nur für die Darstellung (Fahrzeuge, Feldarbeit) */
+  today: TodayLogistics;
   history: History;
   /** Meldungen aus der Welt, neueste zuletzt */
   messages: WorldMessage[];
@@ -394,3 +396,16 @@ export type Action =
   | { type: 'citizenDialog' }
   | { type: 'signOfftake' }
   | { type: 'signMaintenanceContract' };
+
+export interface TodayLogistics {
+  /** Silage-Anlieferungen: Herkunft (Feld-ID, Angebots-ID, 'spot') */
+  deliveries: { origin: string; kind: 'mais' | 'gruenroggen'; t: number; distanceKm: number; throughVillage: boolean }[];
+  guelle: { origin: string; t: number; distanceKm: number; throughVillage: boolean }[];
+  /** Reststoffpartie angekommen */
+  residueArrived: boolean;
+  /** Felder, auf denen heute geerntet wurde */
+  harvesting: string[];
+  /** Felder, die heute bestellt wurden */
+  sowing: string[];
+  spreadM3: number;
+}

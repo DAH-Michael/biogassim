@@ -27,6 +27,7 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
   const weather = state.weather.days[day];
   const playerChangedToday = state.feedChangedDay === day;
   state.residueDeliveredToday = undefined;
+  state.today = { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0 };
 
   // Ausbauten fertig
   for (const b of state.builds.filter((x) => x.doneDay === day)) {
@@ -51,6 +52,11 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
   const fr = fieldsDay(state);
   const sr = supplyDay(state);
   siloDay(state, [...fr.deliveries, ...sr.deliveries]);
+  for (const d of [...fr.deliveries, ...sr.deliveries]) {
+    state.today.deliveries.push({ origin: d.origin ?? 'spot', kind: d.kind, t: d.t, distanceKm: d.distanceKm, throughVillage: d.throughVillage });
+  }
+  for (const d of fr.deliveries) if (d.origin && !state.today.harvesting.includes(d.origin)) state.today.harvesting.push(d.origin);
+  state.today.residueArrived = state.residueDeliveredToday !== undefined;
 
   // Fütterung und Biologie
   const feed = feedingDay(state, playerChangedToday);
@@ -71,6 +77,7 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
 
   // Gas und BHKW
   const tech = techDay(state, ch4);
+  state.today.spreadM3 = state.digestate.spreadToday;
 
   // Akzeptanz
   const heatOutage = state.heatLineActive && state.chp.status !== 'betrieb' && villageHeatDemandKwh(state) / CONFIG.units.hoursPerDay > CONFIG.finance.heatOutageNoticeKw;

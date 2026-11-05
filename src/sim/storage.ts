@@ -15,7 +15,7 @@ const D = CONFIG.digestate;
 export type SilageKind = 'mais' | 'gruenroggen';
 
 /** Lieferungen eines Tages, die am Tagesende verdichtet werden. */
-export interface SiloDelivery { kind: SilageKind; t: number; quality: number; source?: string; throughVillage: boolean; distanceKm: number }
+export interface SiloDelivery { kind: SilageKind; t: number; quality: number; source?: string; throughVillage: boolean; distanceKm: number; origin?: string }
 
 export function siloStock(state: GameState): number {
   return state.silo.mais.t + state.silo.gruenroggen.t;

@@ -1,0 +1,114 @@
+/* Generiert aus design/tokens.json (DAH Designsystem). Nicht von Hand ändern: npm run tokens */
+:root {
+  /* color */
+  --blau: #36a9e1;
+  --dunkelgruen: #006532;
+  --hellgruen: #94c11c;
+  --gelb: #dedc00;
+  --blau-70: #5fbbe7;
+  --blau-50: #9ad4ed;
+  --blau-30: #c2e5f5;
+  --blau-15: #e0f2fb;
+  --dunkelgruen-70: #4c9067;
+  --dunkelgruen-50: #80b299;
+  --dunkelgruen-30: #b3d1c2;
+  --dunkelgruen-15: #d9e8e0;
+  --hellgruen-70: #afd159;
+  --hellgruen-50: #c9e08d;
+  --hellgruen-30: #e0edbf;
+  --hellgruen-15: #f0f6df;
+  --gelb-70: #e7e54d;
+  --gelb-50: #efee80;
+  --gelb-30: #f5f4b3;
+  --gelb-15: #faf9d9;
+  --cream: #f9ffea;
+  --ink: #1a201d;
+  --ink-forest: #0d2e21;
+  --accent-ink: #16300c;
+  --blau-ink: #1c6a91;
+  --hellgruen-ink: #3d5410;
+  --gelb-ink: #6b6900;
+  --white: #ffffff;
+  --bg-muted: #f4f6f2;
+  --k10: #ececec;
+  --k20: #d9dada;
+  --k40: #b1b2b3;
+  --k60: #878786;
+  --k80: #575656;
+  --k100: #000000;
+  --line: var(--k20);
+  --link: var(--dunkelgruen);
+  --glass-bg: rgba(255,255,255,0.32);
+  --glass-bg-hover: rgba(255,255,255,0.44);
+  --glass-border: rgba(255,255,255,0.45);
+  --glass-border-hover: rgba(255,255,255,0.60);
+  --glass-dark: rgba(8,40,24,0.38);
+  --pill-bg: rgba(54,169,225,0.35);
+  --pill-border: rgba(54,169,225,0.50);
+  --badge-bg: rgba(54,169,225,0.20);
+  --badge-border: rgba(54,169,225,0.40);
+  --pillbtn-bg: rgba(255,255,255,0.20);
+  --glass-bg-strong: rgba(255,255,255,0.72);
+  --success: #4f9d2e;
+  --success-ink: #3a7a1f;
+  --success-soft: #e4f4e0;
+  --warning: #e7b500;
+  --warning-ink: #7d6300;
+  --warning-soft: #fbf2d6;
+  --danger: #c0392b;
+  /* fluid */
+  --fs-h1: clamp(44px, 13vw, 180px);
+  --fs-h2: clamp(28px, 4.6vw, 56px);
+  --fs-h3: clamp(17px, 1.9vw, 21px);
+  --fs-body: clamp(15px, 1.6vw, 18px);
+  --fs-lead: clamp(18px, 1.6vw, 22px);
+  --fs-widget-title: clamp(30px, 6.2vw, 64px);
+  --card-padding: clamp(28px, 4vw, 42px) clamp(28px, 4vw, 40px);
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --space-32: 128px;
+  --content-max: 1200px;
+  /* radius */
+  --radius-xs: 6px;
+  --radius-button: 4px;
+  --radius-input: 10px;
+  --radius-md: 16px;
+  --radius-badge: 18px;
+  --radius-lg: 24px;
+  --radius-card: 28px;
+  --radius-xl: 32px;
+  --radius-pill: 40px;
+  --radius-pillbtn: 60px;
+  --radius-full: 999px;
+  /* shadow */
+  --shadow-glass: 0 20px 40px -12px rgba(0,0,0,0.08);
+  --shadow-glass-hover: 0 28px 48px -14px rgba(0,0,0,0.12);
+  --shadow-button: 0 4px 12px rgba(0,101,50,0.2);
+  --shadow-button-hover: 0 8px 18px rgba(0,101,50,0.3);
+  --shadow-sm: 0 1px 2px rgba(16,40,24,0.06), 0 1px 3px rgba(16,40,24,0.08);
+  --shadow-md: 0 4px 12px rgba(16,40,24,0.08), 0 2px 4px rgba(16,40,24,0.06);
+  --shadow-lg: 0 16px 40px rgba(16,40,24,0.12), 0 4px 12px rgba(16,40,24,0.08);
+  --shadow-nav: 0 4px 24px rgba(8,40,24,0.06);
+  /* blur */
+  --blur-glass: blur(18px) saturate(1.25);
+  --blur-pillbtn: blur(8px);
+  --blur-pill: blur(4px);
+  --blur-nav: blur(22px) saturate(150%);
+  /* gradient */
+  --gradient-ci: linear-gradient(135deg, #36a9e1 0%, #006532 38%, #94c11c 72%, #dedc00 100%);
+  --gradient-ci-h: linear-gradient(90deg, #36a9e1 0%, #006532 38%, #94c11c 72%, #dedc00 100%);
+  --gradient-green: linear-gradient(135deg, #006532 0%, #94c11c 100%);
+  --gradient-energy: linear-gradient(120deg, #94c11c 0%, #dedc00 100%);
+  /* type */
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mail: Calibri, Arial, Helvetica, sans-serif;
+}

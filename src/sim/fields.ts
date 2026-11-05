@@ -64,6 +64,7 @@ export function fieldsDay(state: GameState): FieldDayResult {
         field.sownDay = day;
         field.growth = 0;
         field.harvestedHa = 0;
+        state.today.sowing.push(field.id);
         const cost = cfg.ha * (sowRye ? F.cultivationEurPerHa.gruenroggen : F.cultivationEurPerHa.mais);
         state.finance.balance -= cost;
         ledger(state, 'anbau', cost);
@@ -114,7 +115,7 @@ export function fieldsDay(state: GameState): FieldDayResult {
         data: { field: field.id, crop: kind, offsetToOptimum: offset },
       }).id;
     }
-    result.deliveries.push({ kind, t, quality, source: field.harvestStartEvent, throughVillage: cfg.throughVillage, distanceKm: cfg.distanceKm });
+    result.deliveries.push({ kind, t, quality, source: field.harvestStartEvent, throughVillage: cfg.throughVillage, distanceKm: cfg.distanceKm, origin: field.id });
     const transport = t * (CONFIG.contracts.silageTransportEurPerTKm * cfg.distanceKm + CONFIG.contracts.silageHandlingEurPerT);
     state.finance.balance -= transport;
     ledger(state, 'transport', transport);

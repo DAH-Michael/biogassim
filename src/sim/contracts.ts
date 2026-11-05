@@ -54,7 +54,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
     if (c.delivered >= c.tonnes || day < c.startDay || weather.wet) continue;
     const t = Math.min(c.deliveryTPerDay, c.tonnes - c.delivered);
     c.delivered += t;
-    res.deliveries.push({ kind: c.kind, t, quality: CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm });
+    res.deliveries.push({ kind: c.kind, t, quality: CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm, origin: c.offerId });
     const cost = t * (c.priceEurPerT + K.silageTransportEurPerTKm * c.distanceKm + K.silageHandlingEurPerT);
     state.finance.balance -= cost;
     ledger(state, 'substrat', t * c.priceEurPerT);
@@ -69,7 +69,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
   // Nachkauf
   for (const o of state.spotOrders) {
     if (o.arrivalDay !== day) continue;
-    res.deliveries.push({ kind: 'mais', t: o.tonnes, quality: CONFIG.fields.spotQuality, source: o.eventId, throughVillage: true, distanceKm: K.spot.distanceKm });
+    res.deliveries.push({ kind: 'mais', t: o.tonnes, quality: CONFIG.fields.spotQuality, source: o.eventId, throughVillage: true, distanceKm: K.spot.distanceKm, origin: 'spot' });
     state.harvestTotals.mais.spot += o.tonnes;
     res.trafficTrips += Math.ceil(o.tonnes / CONFIG.fields.trailerT) * 2;
     res.trafficSource = res.trafficSource ?? o.eventId;
@@ -196,6 +196,7 @@ export function takeGuelle(state: GameState, wantT: number): { t: number; traffi
       trips += Math.ceil(t / K.guelleTruckT) * 2;
       source = source ?? s.eventId;
     }
+    if (t > 0) state.today.guelle.push({ origin: s.supplierId, t, distanceKm: s.distanceKm, throughVillage: s.throughVillage });
   }
   return { t: wantT - left, trafficTrips: trips, trafficSource: source };
 }

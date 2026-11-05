@@ -189,6 +189,7 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
     },
     actionLog: [],
     noticeFlags: {},
+    today: { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0 },
   };
 
   // Bestehende Gülleverträge des Vorbesitzers
