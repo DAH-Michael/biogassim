@@ -17,6 +17,7 @@ import { fmt, h } from './dom';
  */
 export interface AnalysisOptions {
   onRestart: () => void;
+  onMenu?: () => void;
   /** Zusatzinhalt nach Ebene 1 (Speichercode, Freischaltungen; Meilenstein 5) */
   extra?: HTMLElement | null;
 }
@@ -30,7 +31,7 @@ export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement 
     h('p', { class: 'eyebrow' }, failed ? 'Durchlauf beendet' : 'Jahresbilanz'),
     h('h2', { id: 'end-title' }, failed ? FAILURE_TITLES[s.failure!.kind] : tierName(y.tier)),
     h('p', { class: 'analysis__sentence' }, outcomeSentence(s)),
-    restart,
+    h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', onclick: opts.onMenu }, 'Zum Startmenü') : null),
   );
 
   const parts: HTMLElement[] = [head];

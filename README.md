@@ -2,7 +2,7 @@
 
 A small sim game to promote biogas.
 
-Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 4, Scheitern und Analyse** (Metaprogression und Startmenü folgen in Meilenstein 5).
+Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 5, Metaprogression und Startmenü** (Feinschliff und Debug-Panel folgen in Meilenstein 6).
 
 ## Befehle
 
@@ -25,7 +25,9 @@ Bedienung: Leiste links mit den Entscheidungsbereichen, Kennwertleiste rechts, M
 | F, B, A, T, P, G, U, K | Fütterung, Beschaffung, Felder (Acker), Technik, Personal, Gärrest, Ausbau und Dorf, Finanzen (Konto) |
 | Esc | Bereich schließen |
 
-URL-Parameter für Abnahme und Balancing:
+Fortschritt: Freischaltungen gelten für die laufende Sitzung. Am Ende jedes Durchlaufs erscheint ein Speichercode (12 Zeichen in Vierergruppen, mit Kopierknopf), der im Startmenü wieder eingegeben werden kann. Im Browser wird nichts gespeichert.
+
+URL-Parameter für Abnahme und Balancing (sie überspringen das Startmenü, außer `?debug` allein):
 
 | Parameter | Wirkung |
 |---|---|
@@ -55,6 +57,7 @@ Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_a
 | `src/ui/` | Oberfläche: Spielsteuerung, Kennwertleiste, Entscheidungsbereiche, Meldungen |
 | `src/content/messages.de.ts` | Texte der Meldungen aus der Welt |
 | `src/content/analysis.de.ts` | Satz der ersten Ebene und Hintergrundtexte der Analyse |
+| `src/ui/menu.ts`, `src/ui/savecodeView.ts` | Startmenü mit Szenarien, Freischaltungen und Codeeingabe; Codeanzeige mit Kopieren |
 | `src/ui/analysis.ts`, `src/ui/charts.ts` | Analyse in drei Ebenen, Verläufe mit Ereignisleiste und Tabellenansicht |
 | `tools/simulate.ts` | Konsolenwerkzeug |
 | `docs/` | Annahmen, Modell, offene Punkte |

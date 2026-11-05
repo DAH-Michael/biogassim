@@ -54,7 +54,7 @@ export class App {
   private endOverlay: HTMLElement;
   private canvas: HTMLCanvasElement;
 
-  constructor(root: HTMLElement, game: GameController, private makeScene: (c: HTMLCanvasElement) => Scene, private restart: () => void) {
+  constructor(root: HTMLElement, game: GameController, private makeScene: (c: HTMLCanvasElement) => Scene, private restart: () => void, private toMenu: () => void = () => undefined) {
     this.game = game;
     this.dateEl = h('span', { class: 'calendar__date' });
     this.metaEl = h('span', { class: 'calendar__meta' });
@@ -118,7 +118,7 @@ export class App {
   /** Neuen Durchlauf anhängen (Neustart). */
   attach(game: GameController): void {
     this.game = game;
-    this.endOverlay.hidden = true;
+    this.hideOverlay();
     this.ticker.clear(0);
     game.on((s, reason) => {
       if (reason !== 'speed') {
@@ -232,6 +232,8 @@ export class App {
       return;
     }
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    // Solange Startmenü oder Analyse offen sind, gelten die Spieltasten nicht
+    if (!this.endOverlay.hidden) return;
     if (e.key === ' ') {
       if (t instanceof HTMLButtonElement) return;
       this.game.setSpeed(this.game.speed === 0 ? 1 : 0);
@@ -250,10 +252,32 @@ export class App {
   private showEnd(s: GameState): void {
     this.close();
     this.ticker.clear(s.messages.length);
-    const view = buildAnalysis(s, { onRestart: () => this.restart(), extra: this.endExtra?.(s) ?? null });
-    this.endOverlay.replaceChildren(h('div', { class: 'end__card' }, view));
+    const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra: this.endExtra?.(s) ?? null });
+    this.showOverlay(view);
+  }
+
+  /** Startmenü oder Analyse über der Spielfläche zeigen. */
+  showOverlay(content: HTMLElement): void {
+    this.close();
+    this.endOverlay.replaceChildren(h('div', { class: 'end__card' }, content));
     this.endOverlay.hidden = false;
+    this.endOverlay.scrollTop = 0;
+    // Leiste und Zeitsteuerung sind hinter Startmenü und Analyse nicht bedienbar
+    this.setBackgroundInert(true);
     (this.endOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus();
+  }
+
+  hideOverlay(): void {
+    this.endOverlay.hidden = true;
+    this.setBackgroundInert(false);
+  }
+
+  private setBackgroundInert(on: boolean): void {
+    for (const el of [this.rail, this.timeButtons[0]?.parentElement]) {
+      if (!el) continue;
+      if (on) el.setAttribute('inert', '');
+      else el.removeAttribute('inert');
+    }
   }
 
   /** Zusatzinhalt für das Ende (Speichercode, Freischaltungen), von außen gesetzt. */

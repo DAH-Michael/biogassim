@@ -196,6 +196,8 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
   for (const id of CONFIG.contracts.startGuelleContracts) {
     state.guelleContracts.push({ supplierId: id, activeFromDay: 0, eventId: origin.feeding });
   }
+  // Größeres Gärrestlager ab Start (Freischaltung): als zweites Lager sichtbar
+  if (scenario.largerStorage) state.built.digestateStorage = origin.storage;
   // Wärmeleitung ab Start (Freischaltung)
   if (scenario.heatLineAtStart) {
     state.heatLineActive = true;
