@@ -319,6 +319,19 @@ input.code__input { width: 9.5em; }
 .code__msg { min-height: 1.4em; margin: var(--space-1) 0 0; font-size: 14px; }
 .code__msg[data-state='error'] { color: var(--danger); font-weight: 600; }
 
+/* Ergebnis am Ende eines Durchlaufs */
+.score { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3) var(--space-6); margin: var(--space-4) 0; padding: var(--space-4) var(--space-6); border-radius: var(--radius-md); background: var(--dunkelgruen); color: var(--cream); }
+.score__main { min-width: 0; }
+.score__label { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--hellgruen-30); }
+.score__value { margin: var(--space-1) 0; font-family: var(--font-display); font-weight: 900; font-size: clamp(40px, 6vw, 64px); line-height: 1; font-variant-numeric: tabular-nums; color: var(--white); }
+.score__note { margin: 0; font-size: 14px; }
+.score__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.score__chips li { padding: var(--space-1) var(--space-3); border: 1px solid var(--dunkelgruen-50); border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; }
+.score--failed { background: var(--bg-muted); color: var(--ink); }
+.score--failed .score__label { color: var(--k80); }
+.score--failed .score__value { color: var(--k80); }
+.score--failed .score__chips li { border-color: var(--k20); }
+
 /* DAH-Beraterin (Tutorial) */
 .advisor { position: absolute; left: var(--space-3); bottom: var(--space-3); z-index: 2; width: min(460px, calc(100% - 2 * var(--space-3))); display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); background: var(--white); border: 2px solid var(--dunkelgruen); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
 .advisor[hidden] { display: none; }

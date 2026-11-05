@@ -89,9 +89,12 @@ function showMenu(): void {
 
 /** Freischaltungen am Ende eines Durchlaufs, einmal je Durchlauf berechnet. */
 const gainedByRun = new WeakMap<GameState, string[]>();
+/** Bester Kontostand eines beendeten Jahres in dieser Sitzung, nur im Speicher. */
+let bestBalance: number | null = null;
 function endExtra(s: GameState): HTMLElement {
   let gained = gainedByRun.get(s);
   if (!gained) {
+    if (s.finished && !s.failure) bestBalance = bestBalance === null ? s.finance.balance : Math.max(bestBalance, s.finance.balance);
     const failureType = s.failure ? s.log.events.find((e) => e.id === s.failure!.eventId)?.type ?? null : null;
     gained = newUnlocks(unlocks, { failureType, tier: s.failure ? null : yearSummary(s).tier });
     unlocks = [...unlocks, ...gained];
@@ -113,6 +116,7 @@ function endExtra(s: GameState): HTMLElement {
 
 const app = new App(root, game, (c) => new Scene(c, paletteFromDocument()), () => startRun(lastScenario), showMenu);
 app.endExtra = endExtra;
+app.sessionBest = () => bestBalance;
 if (!testStart) showMenu();
 
 // Debug-Modus: Panel (Taste D) und Lesezugriff für automatische Prüfungen

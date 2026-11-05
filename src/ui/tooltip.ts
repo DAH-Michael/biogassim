@@ -14,6 +14,8 @@ export class Tooltips {
   private timer: number | undefined;
   private pressTimer: number | undefined;
   private suppressClickOn: HTMLElement | null = null;
+  /** Fokus-Tooltips nur bei echter Tastaturbedienung, nicht bei programmatischem Fokus */
+  private keyboard = false;
 
   constructor() {
     this.el = h('div', { class: 'tip', role: 'tooltip', id: 'tooltip', hidden: true });
@@ -31,8 +33,12 @@ export class Tooltips {
     });
     document.addEventListener('focusin', (e) => {
       const t = this.find(e.target);
-      if (t && (e.target as HTMLElement).matches(':focus-visible')) this.schedule(t, 0);
+      if (t && this.keyboard) this.schedule(t, 0);
     });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' || e.key.startsWith('Arrow')) this.keyboard = true;
+    }, true);
+    document.addEventListener('pointerdown', () => { this.keyboard = false; }, true);
     document.addEventListener('focusout', () => this.hide());
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.hide();

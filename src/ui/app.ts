@@ -402,7 +402,8 @@ export class App {
     this.close();
     this.advisor.reset(false);
     this.ticker.clear(s.messages.length);
-    const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra: this.endExtra?.(s) ?? null });
+    const extra = this.endExtra?.(s) ?? null;
+    const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra, sessionBest: this.sessionBest?.() ?? null });
     this.showOverlay(view);
   }
 
@@ -429,6 +430,9 @@ export class App {
       else el.removeAttribute('inert');
     }
   }
+
+  /** Bester Kontostand der Sitzung, von außen gesetzt. */
+  sessionBest?: () => number | null;
 
   /** Zusatzinhalt für das Ende (Speichercode, Freischaltungen), von außen gesetzt. */
   endExtra?: (s: GameState) => HTMLElement | null;
