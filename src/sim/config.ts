@@ -744,6 +744,8 @@ export const CONFIG = {
     bioErrorShare: [0.1, 0.03] as const,
     /** Stufen: Mindestpunkte. Namen in content */
     tiers: [0, 3, 6, 9] as const,
+    /** Höchstpunktzahl: vier Kennzahlen mit je zwei Punkten, Vorrat und Maisdeckel mit je einem */
+    maxPoints: 10,
   },
 
   /** Ereignisprotokoll */

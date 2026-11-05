@@ -2,7 +2,7 @@
 
 A small sim game to promote biogas.
 
-Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 3, Bedienung** (Scheitern und Analyse folgen in Meilenstein 4).
+Browserspiel rund um eine 500-kW-Biogasanlage. Stand: **Meilenstein 4, Scheitern und Analyse** (Metaprogression und Startmenü folgen in Meilenstein 5).
 
 ## Befehle
 
@@ -54,6 +54,8 @@ Strategien: `nichts`, `naiv`, `nur_mais`, `nur_guelle`, `ausgewogen`, `wartung_a
 | `design/tokens.json` | Export des DAH Designsystems |
 | `src/ui/` | Oberfläche: Spielsteuerung, Kennwertleiste, Entscheidungsbereiche, Meldungen |
 | `src/content/messages.de.ts` | Texte der Meldungen aus der Welt |
+| `src/content/analysis.de.ts` | Satz der ersten Ebene und Hintergrundtexte der Analyse |
+| `src/ui/analysis.ts`, `src/ui/charts.ts` | Analyse in drei Ebenen, Verläufe mit Ereignisleiste und Tabellenansicht |
 | `tools/simulate.ts` | Konsolenwerkzeug |
 | `docs/` | Annahmen, Modell, offene Punkte |
 

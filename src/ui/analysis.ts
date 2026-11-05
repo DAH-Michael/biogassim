@@ -1,0 +1,139 @@
+import { CONFIG } from '../sim/config';
+import { formatDate } from '../sim/calendar';
+import { causalClosure, findEvent, mainPath, type SimEvent } from '../sim/eventlog';
+import { yearSummary } from '../sim/rating';
+import { describeEvent, FAILURE_TITLES } from '../content/events.de';
+import { BACKGROUND, eventIcon, outcomeSentence, tierName } from '../content/analysis.de';
+import type { GameState } from '../sim/types';
+import { buildTimeline } from './charts';
+import { fmt, h } from './dom';
+
+/**
+ * Analyse nach dem Ende eines Durchlaufs, in drei aufklappbaren Ebenen:
+ * 1. ein Satz und sofort „Neuer Versuch“,
+ * 2. die Kausalkette rückwärts vom Scheitern zur eigentlichen Ursache,
+ * 3. Verläufe der wichtigsten Werte mit Ereignismarken.
+ * Bei Erfolg: Jahresbilanz mit Bewertung, wichtige Ereignisse und Verläufe.
+ */
+export interface AnalysisOptions {
+  onRestart: () => void;
+  /** Zusatzinhalt nach Ebene 1 (Speichercode, Freischaltungen; Meilenstein 5) */
+  extra?: HTMLElement | null;
+}
+
+export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement {
+  const y = yearSummary(s);
+  const failed = s.failure !== null;
+  const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', onclick: opts.onRestart }, 'Neuer Versuch');
+
+  const head = h('header', { class: 'analysis__head' },
+    h('p', { class: 'eyebrow' }, failed ? 'Durchlauf beendet' : 'Jahresbilanz'),
+    h('h2', { id: 'end-title' }, failed ? FAILURE_TITLES[s.failure!.kind] : tierName(y.tier)),
+    h('p', { class: 'analysis__sentence' }, outcomeSentence(s)),
+    restart,
+  );
+
+  const parts: HTMLElement[] = [head];
+  if (opts.extra) parts.push(opts.extra);
+  parts.push(summaryBlock(s, failed));
+  if (failed) parts.push(chainBlock(s));
+  else parts.push(eventsBlock(s));
+  parts.push(h('details', { class: 'level' }, h('summary', {}, h('span', { class: 'level__title' }, 'Verläufe über das Jahr')), buildTimeline(s)));
+  return h('div', { class: 'analysis' }, ...parts);
+}
+
+// ---------- Kennzahlen ----------
+
+function summaryBlock(s: GameState, failed: boolean): HTMLElement {
+  const y = yearSummary(s);
+  const rows: [string, string][] = [
+    ['Strom erzeugt', `${fmt.int(y.kwhEl / 1000)} MWh`],
+    ['Gewinn', fmt.eur(y.profitEur)],
+    ['Akzeptanz im Mittel', `${fmt.int(y.acceptanceAvg)} von 100`],
+    ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} % (Fackel ${fmt.int(y.flaredM3)} m³ Biogas, Lager ${fmt.int(y.ch4LostStorageM3)} m³ Methan)`],
+    ['Maisanteil an der Masse', fmt.pct(y.maizeShare)],
+    ['Tage mit gestörter Biologie', fmt.pct(y.bioErrorShare)],
+  ];
+  if (!failed) rows.push(['Vorrat bis zur nächsten Ernte', `${fmt.int(y.supplyDays)} Tage`]);
+  return h('details', { class: 'level', open: !failed },
+    h('summary', {}, h('span', { class: 'level__title' }, failed ? `Kennzahlen bis zum ${formatDate(s.failure!.day)}` : 'Kennzahlen des Jahres')),
+    h('dl', { class: 'figures' }, ...rows.map(([k, v]) => h('div', { class: 'figure' }, h('dt', {}, k), h('dd', {}, v)))),
+    failed ? null : h('p', { class: 'muted' }, `Bewertung aus Gewinn, Akzeptanz, Gasverlusten, Biologie, Vorrat und Maisdeckel: ${y.points} von ${CONFIG.rating.maxPoints} Punkten.`),
+  );
+}
+
+// ---------- Kausalkette ----------
+
+function chainItem(s: GameState, e: SimEvent, role: 'scheitern' | 'ausloeser' | 'ursache' | null, gapDays: number | null): HTMLElement {
+  const t = describeEvent(e);
+  const kind = eventIcon(e.type, e.playerDecision);
+  const badges: HTMLElement[] = [];
+  if (role === 'ausloeser') badges.push(h('span', { class: 'badge badge--trigger' }, 'Auslöser'));
+  if (role === 'ursache') badges.push(h('span', { class: 'badge badge--root' }, 'Ursache'));
+  if (kind === 'decision') badges.push(h('span', { class: 'badge badge--decision' }, 'Ihre Entscheidung'));
+  if (kind === 'origin') badges.push(h('span', { class: 'badge badge--origin' }, 'Ausgangslage'));
+  const bg = BACKGROUND[e.type];
+  return h('li', { class: `chain__item chain__item--${role ?? 'step'} chain__item--${kind}` },
+    gapDays !== null && gapDays > 0 ? h('p', { class: 'chain__gap' }, gapDays === 1 ? '1 Tag davor' : `${fmt.int(gapDays)} Tage davor`) : null,
+    h('div', { class: 'chain__card' },
+      h('div', { class: 'chain__meta' }, h('span', { class: 'chain__date' }, formatDate(e.day)), ...badges),
+      h('h4', {}, t.title),
+      t.text ? h('p', {}, t.text) : null,
+      bg ? h('details', { class: 'chain__bg' }, h('summary', {}, 'Hintergrund'), h('p', {}, bg)) : null,
+    ),
+  );
+}
+
+function chainBlock(s: GameState): HTMLElement {
+  const path = mainPath(s.log, s.failure!.eventId);
+  const items = path.map((e, i) => {
+    const role = i === 0 ? 'scheitern' : i === path.length - 1 && path.length > 1 ? 'ursache' : i === 1 ? 'ausloeser' : null;
+    const gap = i === 0 ? null : path[i - 1].day - e.day;
+    return chainItem(s, e, role, gap);
+  });
+  // Auslöser und Ursache identisch: beide Abzeichen zeigen
+  if (path.length === 2) items[1].querySelector('.chain__meta')!.insertBefore(h('span', { class: 'badge badge--trigger' }, 'Auslöser'), items[1].querySelector('.badge'));
+  const others = causalClosure(s.log, s.failure!.eventId).filter((e) => !path.includes(e)).reverse();
+  const root = path[path.length - 1];
+  return h('details', { class: 'level', open: true },
+    h('summary', {}, h('span', { class: 'level__title' }, 'Wie es dazu kam')),
+    h('p', { class: 'muted' }, `Vom Ende rückwärts bis zur eigentlichen Ursache am ${formatDate(root.day)}.`),
+    h('ol', { class: 'chain' }, ...items),
+    others.length
+      ? h('details', { class: 'chain__others' },
+        h('summary', {}, `Weitere beteiligte Ereignisse (${others.length})`),
+        h('ul', {}, ...others.map((e) => {
+          const t = describeEvent(e);
+          return h('li', {}, h('span', { class: 'chain__date' }, formatDate(e.day)), ' ', t.title, e.playerDecision ? h('span', { class: 'badge badge--decision' }, 'Ihre Entscheidung') : null, t.text ? h('span', { class: 'muted' }, ` ${t.text}`) : null);
+        })))
+      : null,
+  );
+}
+
+// ---------- Wichtige Ereignisse bei Erfolg ----------
+
+function eventsBlock(s: GameState): HTMLElement {
+  const important = s.log.events.filter((e) => e.severity === 'warning' || e.severity === 'critical');
+  const items = important.map((e) => {
+    const t = describeEvent(e);
+    const path = mainPath(s.log, e.id);
+    const root = path.length > 1 ? path[path.length - 1] : null;
+    const rootText = root ? describeEvent(root).title : null;
+    const bg = BACKGROUND[e.type];
+    return h('li', { class: 'chain__item' },
+      h('div', { class: 'chain__card' },
+        h('div', { class: 'chain__meta' }, h('span', { class: 'chain__date' }, formatDate(e.day))),
+        h('h4', {}, t.title),
+        t.text ? h('p', {}, t.text) : null,
+        rootText ? h('p', { class: 'muted' }, `Zurückzuführen auf: ${rootText} (${formatDate(root!.day)})${root!.playerDecision ? ', Ihre Entscheidung' : ''}`) : null,
+        bg ? h('details', { class: 'chain__bg' }, h('summary', {}, 'Hintergrund'), h('p', {}, bg)) : null,
+      ),
+    );
+  });
+  return h('details', { class: 'level' },
+    h('summary', {}, h('span', { class: 'level__title' }, `Schwierige Momente des Jahres (${important.length})`)),
+    items.length ? h('ol', { class: 'chain chain--plain' }, ...items) : h('p', {}, 'Keine Warnungen im ganzen Jahr.'),
+  );
+}
+
+export { findEvent };

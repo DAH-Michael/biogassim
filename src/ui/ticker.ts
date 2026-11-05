@@ -42,6 +42,14 @@ export class Ticker {
     if (!this.current) this.next();
   }
 
+  /** Alle Meldungen verwerfen (Ende des Durchlaufs, Neustart). */
+  clear(seen = this.seen): void {
+    this.queue = [];
+    this.seen = seen;
+    this.current = null;
+    this.el.hidden = true;
+  }
+
   /** Echtzeit-Fortschritt; läuft nur, wenn das Spiel läuft. */
   tick(dt: number, running: boolean): void {
     if (!this.current || !running) return;

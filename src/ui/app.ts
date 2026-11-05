@@ -1,7 +1,6 @@
 import { CONFIG } from '../sim/config';
 import { dateOfDay, formatDate } from '../sim/calendar';
-import { yearSummary } from '../sim/rating';
-import { FAILURE_TITLES, TIER_NAMES } from '../content/events.de';
+import { buildAnalysis } from './analysis';
 import type { GameState } from '../sim/types';
 import { Scene } from '../render/scene';
 import { unproject } from '../render/iso';
@@ -120,6 +119,7 @@ export class App {
   attach(game: GameController): void {
     this.game = game;
     this.endOverlay.hidden = true;
+    this.ticker.clear(0);
     game.on((s, reason) => {
       if (reason !== 'speed') {
         this.scene.update(s);
@@ -245,15 +245,17 @@ export class App {
     if (p) this.toggle(p.id);
   }
 
-  // ---------- Ende (vorläufig; die Analyse folgt in Meilenstein 4) ----------
+  // ---------- Ende: Analyse ----------
 
   private showEnd(s: GameState): void {
-    const y = yearSummary(s);
-    const title = s.failure ? FAILURE_TITLES[s.failure.kind] : 'Jahr geschafft';
-    const sub = s.failure ? `am ${formatDate(s.failure.day)}` : `Bewertung: ${TIER_NAMES[y.tier ?? 0]}`;
-    const btn = h('button', { type: 'button', class: 'btn btn--primary', onclick: () => this.restart() }, 'Neuer Versuch');
-    this.endOverlay.replaceChildren(h('div', { class: 'end__card' }, h('h2', { id: 'end-title' }, title), h('p', {}, sub), btn));
+    this.close();
+    this.ticker.clear(s.messages.length);
+    const view = buildAnalysis(s, { onRestart: () => this.restart(), extra: this.endExtra?.(s) ?? null });
+    this.endOverlay.replaceChildren(h('div', { class: 'end__card' }, view));
     this.endOverlay.hidden = false;
-    btn.focus();
+    (this.endOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus();
   }
+
+  /** Zusatzinhalt für das Ende (Speichercode, Freischaltungen), von außen gesetzt. */
+  endExtra?: (s: GameState) => HTMLElement | null;
 }
