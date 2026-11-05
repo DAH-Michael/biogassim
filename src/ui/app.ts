@@ -155,6 +155,7 @@ export class App {
       }
       this.updateTime();
     });
+    this.updateRail(game.state);
     this.scene.update(game.state);
     this.metrics.update(game.state);
     this.updateCalendar(game.state);
@@ -166,6 +167,7 @@ export class App {
   /** Alles neu zeichnen, z. B. nach einem Sprung im Debug-Modus. */
   refresh(): void {
     const s = this.game.state;
+    this.updateRail(s);
     this.ticker.clear(s.messages.length);
     this.scene.update(s);
     this.metrics.update(s);
@@ -201,6 +203,20 @@ export class App {
 
   // ---------- Entscheidungsbereiche ----------
 
+  /** Bereiche, die es in der Stufe des Durchlaufs nicht gibt, verschwinden aus der Leiste. */
+  private updateRail(s: GameState): void {
+    for (const p of PANELS) {
+      const btn = this.rail.querySelector(`[data-panel="${p.id}"]`) as HTMLElement | null;
+      if (btn) btn.hidden = p.available ? !p.available(s) : false;
+    }
+    if (this.openPanel && !this.panelAvailable(this.openPanel.id)) this.close();
+  }
+
+  private panelAvailable(id: string): boolean {
+    const p = PANELS.find((x) => x.id === id);
+    return !!p && (!p.available || p.available(this.game.state));
+  }
+
   toggle(id: string): void {
     if (this.openPanel?.id === id) this.close();
     else this.open(id);
@@ -208,7 +224,7 @@ export class App {
 
   open(id: string): void {
     const p = PANELS.find((x) => x.id === id);
-    if (!p) return;
+    if (!p || !this.panelAvailable(id)) return;
     this.openPanel = p;
     this.drawer.hidden = false;
     this.drawerTitle.textContent = p.title;
@@ -310,7 +326,7 @@ export class App {
     const v = this.scene.currentView;
     for (const z of HIT_HEIGHTS) {
       const [x, y] = unproject(v, sx, sy + z * v.scale);
-      const hit = HITS.find((hh) => hh.test(x, y));
+      const hit = HITS.find((hh) => hh.test(x, y) && this.panelAvailable(hh.panel));
       if (hit) return hit;
     }
     return null;

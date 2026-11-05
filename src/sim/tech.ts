@@ -4,7 +4,7 @@ import { round } from './biology';
 import { chance, intRange, range } from './rng';
 import { say } from './messages';
 import { hasStaff, ledger } from './storage';
-import { difficulty } from './difficulty';
+import { difficulty, hasFeature } from './difficulty';
 import type { GameState } from './types';
 
 /**
@@ -54,7 +54,7 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
   desulf.rawPpm = rawUnits * DS.rawPpmPerUnit;
   const loadRel = (ch4ProducedM3 / chpCh4PerDay()) * rawUnits;
   if (desulf.mediumDays > 0) {
-    if (difficulty(state).desulfConsumable) desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
+    if (difficulty(state).desulfConsumable && hasFeature(state, 'entschwefelung')) desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
     desulf.cleanPpm = desulf.rawPpm * DS.withMediumResidual;
   } else {
     desulf.cleanPpm = desulf.rawPpm * (1 - DS.biologicalRemoval);
@@ -100,7 +100,8 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
 
   // Verschleiß
   const overdue = Math.max(0, chp.hoursSinceService - C.serviceIntervalH) / C.serviceIntervalH;
-  const h2sMult = 1 + C.h2sWearPer100ppm * (desulf.cleanPpm / 100);
+  // Ohne Entschwefelung als Funktion (Stufe Vereinfacht) gibt es auch keinen Schwefel-Verschleiß
+  const h2sMult = hasFeature(state, 'entschwefelung') ? 1 + C.h2sWearPer100ppm * (desulf.cleanPpm / 100) : 1;
   const overdueMult = 1 + C.overdueWearFactor * overdue;
   let wear = (C.wearPerYear / C.wearReferenceHours) * hours * h2sMult * overdueMult;
   if (hasStaff(state, 'techniker')) wear *= CONFIG.staff.technicianWearFactor;

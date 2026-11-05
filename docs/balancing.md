@@ -133,13 +133,31 @@ Mit weniger Gülle in der Nähe reißen die üblichen Strategien den Maisdeckel.
 
 ## Schwierigkeitsgrade (nach dem ersten Test ergänzt)
 
-Die Stufen ändern die Simulationstiefe, nicht das Startszenario. Werte in `CONFIG.difficulty`.
+Die Stufen ändern Funktionsumfang und Simulationstiefe, nicht das Startszenario. Werte in `CONFIG.difficulty`, Zuordnung der Funktionen in `features`. Gesperrte Entscheidungen lehnt die Simulation ab, die Oberfläche zeigt sie nicht.
 
-| Stufe | Was anders ist |
-|---|---|
-| Vereinfacht | keine Spurenelemente, kein Stress durch Futterwechsel, Methanbildner wachsen schneller, Laborwert täglich, keine zufälligen BHKW-Störungen, Entschwefelung ohne Verbrauch, keine Verdichtungsverluste, keine Störstoffe, keine Dürre |
-| Normal | wie bisher |
-| Real | Methanbildner wachsen langsamer, Futterwechsel belasten stärker, Laborwert nach fünf Tagen und ungenauer, mehr BHKW-Störungen, Netzausfälle, Rührwerksstörungen, häufiger Dürre, stärker schwankende Reststoffe |
+| Funktion | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| Fütterung, Mais- und Grünroggenverträge, Gülle, Nachkauf | ja | ja | ja |
+| kleine Wartung, Gärrest ausbringen, Finanzen, Dorf | ja | ja | ja |
+| Ausbau: Gärrestlager, Abdeckung, Wärmeleitung | ja | ja | ja |
+| Entschwefelung | nein | ja | ja |
+| Reststoffmarkt | nein | ja | ja |
+| eigene Felder (Pacht, Kultur Mais oder Grünroggen) | nein | ja | ja |
+| Instandsetzung BHKW | nein | ja | ja |
+| Ausbau: größerer Gasspeicher, zweites Fahrsilo | nein | ja | ja |
+| Personal: Biologin, Verfahrenstechniker | nein | ja | ja |
+| Personal: Agrarberaterin, Energievermarkter | nein | nein | ja |
+| Zweikultur und eigener Erntetermin | nein | nein | ja |
+
+| Simulationstiefe | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| Spurenelemente, Stress durch Futterwechsel | nein | ja | ja, Wechsel belasten stärker |
+| Wachstum der Methanbildner | schneller | normal | langsamer |
+| Laborwert FOS/TAC | täglich | wöchentlich, 3 Tage Verzug | wöchentlich, 5 Tage Verzug, ungenauer |
+| zufällige BHKW-Störungen | nein | ja | mehr |
+| Verdichtungsverluste im Silo, Störstoffe | nein | ja | ja, Reststoffe schwanken stärker |
+| Dürrejahr | nie | 15 % | 25 % |
+| Netzausfälle, Rührwerksstörungen | nein | nein | ja |
 
 Sperrfrist und Maisdeckel gelten in allen Stufen. Der naive erste Versuch scheitert deshalb überall am Gärrestlager.
 
@@ -151,5 +169,6 @@ Ergebnisse (je 30 Seeds, Altanlage):
 | versuch2 (Ausbringung, keine Wartung) | scheitert (BHKW-Totalschaden im März, danach kühlt der Fermenter aus) | scheitert (BHKW im November) | scheitert (BHKW im November) |
 | versuch3 | gelingt immer, Ø 129.000 € | gelingt immer, Ø 32.000 € | gelingt immer, Ø −19.000 € |
 | kein_personal | gelingt immer, Ø 134.000 € | gelingt immer, Ø 45.000 € | gelingt in 29 von 30, Ø 5.000 € |
-| nur_mais | übersteht das Jahr mit hohem Verlust (Maisdeckel) | scheitert immer | scheitert immer |
-| vorbildlich | immer „Vorbildlich“ | 13 von 30 „Vorbildlich“ | 13 von 30 „Vorbildlich“ |
+| vorbildlich | immer „Vorbildlich“ (ohne Personal, das es hier nicht gibt) | 6 von 30 „Vorbildlich“ (ohne Vermarkter) | 13 von 30 „Vorbildlich“ |
+
+In „Vereinfacht“ ist ein gutes Jahr leicht zu erreichen. Das ist gewollt: Die Stufe zeigt die Grundzusammenhänge, ohne mit Details zu überfordern.

@@ -54,3 +54,38 @@ describe('Schwierigkeitsgrade', () => {
     expect(a.finance.balance).toBe(b.finance.balance);
   });
 });
+
+describe('Funktionsumfang je Stufe', () => {
+  const g = (d: 'vereinfacht' | 'normal' | 'real') => createGame(1, { id: 'altanlage', difficulty: d });
+
+  it('Vereinfacht: keine Entschwefelung, kein Personal, keine Reststoffe, keine Felder, keine Instandsetzung', async () => {
+    const { applyAction } = await import('../src/sim/actions');
+    const s = g('vereinfacht');
+    expect(applyAction(s, { type: 'orderService', kind: 'entschwefelung' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'orderService', kind: 'gross' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'hire', role: 'biologin' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'build', kind: 'gasStorage' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'orderService', kind: 'klein' }).ok).toBe(true);
+    expect(applyAction(s, { type: 'build', kind: 'cover' }).ok).toBe(true);
+    runDays(s, 30);
+    expect(s.residueOffers).toHaveLength(0);
+  });
+
+  it('Normal: Biologin und Techniker ja, Agrarberaterin und Vermarkter nein, keine Zweikultur', async () => {
+    const { applyAction } = await import('../src/sim/actions');
+    const s = g('normal');
+    expect(applyAction(s, { type: 'hire', role: 'techniker' }).ok).toBe(true);
+    expect(applyAction(s, { type: 'hire', role: 'vermarkter' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'hire', role: 'agrar' })).toEqual({ ok: false, reason: 'stufe' });
+    expect(applyAction(s, { type: 'orderService', kind: 'entschwefelung' }).ok).toBe(true);
+  });
+
+  it('Real: voller Funktionsumfang', async () => {
+    const { actionAvailable } = await import('../src/sim/actions');
+    const s = g('real');
+    for (const role of ['biologin', 'techniker', 'agrar', 'vermarkter'] as const) expect(actionAvailable(s, { type: 'hire', role })).toBe(true);
+    expect(actionAvailable(s, { type: 'setCrop', fieldId: 'f1', crop: 'zweikultur' })).toBe(true);
+    expect(actionAvailable(s, { type: 'setHarvestDay', fieldId: 'f1', day: 40 })).toBe(true);
+    expect(actionAvailable(s, { type: 'build', kind: 'secondSilo' })).toBe(true);
+  });
+});

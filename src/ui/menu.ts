@@ -28,18 +28,18 @@ const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs
 const LEVELS: { id: NonNullable<ScenarioOptions['difficulty']>; title: string; text: string; tip: string }[] = [
   {
     id: 'vereinfacht', title: 'Vereinfacht',
-    text: 'Die Biologie verzeiht mehr, der Laborwert kommt täglich, die Technik läuft ohne Zufallsstörungen.',
-    tip: 'Ohne Spurenelemente, Futterwechsel-Stress, zufällige BHKW-Störungen, Verbrauchsmittel der Entschwefelung, Verdichtungsverluste, Störstoffe und Dürre. Sperrfrist und Maisdeckel gelten.',
+    text: 'Die Grundfunktionen: Fütterung, Verträge, Wartung, Gärrest, Ausbau. Die Biologie verzeiht mehr, der Laborwert kommt täglich.',
+    tip: 'Ohne Personal, Entschwefelung, Reststoffe, eigene Felder, Instandsetzung, Gasspeicher- und Siloausbau. Ohne Spurenelemente, Futterwechsel-Stress, zufällige Störungen und Dürre. Sperrfrist und Maisdeckel gelten.'
   },
   {
     id: 'normal', title: 'Normal',
-    text: 'Alle Zusammenhänge der Anlage, so wie sie im Spiel gedacht sind.',
-    tip: 'Biologie mit Spurenelementen und Anpassungszeit, wöchentlicher Laborwert, Verschleiß und Störungen, Silageverluste, Reststoffe mit Risiko, gelegentlich Dürre.',
+    text: 'Dazu Entschwefelung, Reststoffe, eigene Felder, Biologin und Verfahrenstechniker. Die Biologie mit allen Zusammenhängen.',
+    tip: 'Biologie mit Spurenelementen und Anpassungszeit, wöchentlicher Laborwert, Verschleiß und Störungen, Silageverluste, Reststoffe mit Risiko, gelegentlich Dürre. Ohne Agrarberaterin, Energievermarkter, Zweikultur und eigenen Erntetermin.'
   },
   {
     id: 'real', title: 'Real',
-    text: 'Empfindlichere Biologie, Laborwerte mit mehr Verzug, mehr Störungen bis hin zu Netzausfällen.',
-    tip: 'Methanbildner wachsen langsamer, Futterwechsel belasten stärker, Laborwert nach fünf Tagen, mehr BHKW-Störungen, Netzausfälle, Rührwerksstörungen, häufiger Dürre, stärker schwankende Reststoffe.',
+    text: 'Der volle Funktionsumfang mit Agrarberaterin, Energievermarkter, Zweikultur und Erntetermin. Empfindlichere Biologie, mehr Störungen.',
+    tip: 'Alle Funktionen. Methanbildner wachsen langsamer, Futterwechsel belasten stärker, Laborwert nach fünf Tagen, mehr BHKW-Störungen, Netzausfälle, Rührwerksstörungen, häufiger Dürre, stärker schwankende Reststoffe.'
   },
 ];
 

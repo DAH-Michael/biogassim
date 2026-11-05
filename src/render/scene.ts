@@ -1,4 +1,5 @@
 import { CONFIG } from '../sim/config';
+import { hasFeature } from '../sim/difficulty';
 import { dateOfDay, inWindow } from '../sim/calendar';
 import type { FieldState, GameState } from '../sim/types';
 import { fitView, project, type View } from './iso';
@@ -212,7 +213,7 @@ export class Scene {
     if (st.built.digestateStorage) items.push({ depth: P.storage2.cx + P.storage2.cy, draw: () => this.drawStorage(d, st, s, t, P.storage2) });
     items.push({ depth: P.pit.cx + P.pit.cy, draw: () => this.drawPit(d, st) });
     items.push({ depth: P.chp.x + P.chp.w + P.chp.y + P.chp.d, draw: () => this.drawChp(d, st, t) });
-    items.push({ depth: P.desulf.cx + P.desulf.cy, draw: () => this.drawDesulf(d, s) });
+    if (hasFeature(st, 'entschwefelung')) items.push({ depth: P.desulf.cx + P.desulf.cy, draw: () => this.drawDesulf(d, s) });
     if (st.built.gasStorage) items.push({ depth: P.gasStorage2.cx + P.gasStorage2.cy, draw: () => this.drawGasStorage2(d, s) });
     items.push({ depth: P.flare.x + P.flare.y, draw: () => this.drawFlare(d, st, t) });
     VILLAGE.houses.forEach(([x, y], i) => items.push({ depth: x + y + 2, draw: () => this.drawHouse(d, x, y, i, st, t) }));

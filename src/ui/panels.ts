@@ -9,6 +9,7 @@ import type { Action, Crop, GameState } from '../sim/types';
 import type { ActionResult } from '../sim/actions';
 import { fmt, h, svg } from './dom';
 import { TIPS } from '../content/tooltips.de';
+import { buildAvailable, hasFeature, roleAvailable } from '../sim/difficulty';
 import { ICONS, type IconName } from './icons';
 
 /**
@@ -26,6 +27,8 @@ export interface PanelDef {
   icon: IconName;
   key: string;
   render: (ctx: PanelCtx) => HTMLElement;
+  /** Bereich nur in bestimmten Stufen */
+  available?: (s: GameState) => boolean;
 }
 
 const SUBSTRATE_NAMES: Record<SubstrateId, string> = { mais: 'Maissilage', gruenroggen: 'Grünroggensilage', guelle: 'Rindergülle', reststoff: 'Reststoffe' };
@@ -35,6 +38,7 @@ const BUILD_NAMES: Record<BuildKind, string> = {
 };
 const CROP_NAMES: Record<Crop, string> = { brache: 'keine Kultur', mais: 'Mais', gruenroggen: 'Grünroggen', zweikultur: 'Grünroggen, danach Mais' };
 const REASONS: Record<string, string> = {
+  stufe: 'In dieser Schwierigkeitsstufe nicht vorgesehen.',
   abgelaufen: 'Nicht mehr verfügbar.', bereits: 'Besteht bereits.', voll: 'Der Vorlagebehälter ist zu voll.', nicht_frei: 'Die Fläche ist nicht frei.',
   menge: 'Bitte eine Menge angeben.', gesperrt: 'Nicht verfügbar.', zu_frueh: 'Erst später wieder möglich.', keine_ernte: 'Gerade nichts zu ernten.',
   vergangen: 'Der Tag liegt in der Vergangenheit.', ersatz: 'Das BHKW wird gerade ersetzt.', unbekannt: 'Nicht möglich.', beendet: 'Der Durchlauf ist beendet.',
@@ -162,7 +166,7 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
       kv('Preis heute', `${fmt.dec(spotPrice(s), 2)} €/t`),
       row(...[100, 300].map((t) => button(`${t} t kaufen`, () => report('supply', ctx.act({ type: 'buySpot', tonnes: t })), { key: `spot-${t}`, tip: TIPS.buySpot }))),
     ),
-    section('Reststoffe', kv('Vorlagebehälter', `${fmt.int(tank)} von ${fmt.int(CONFIG.plant.residueTankT)} t`), ...(residues.length ? residues : [h('p', { class: 'muted' }, 'Gerade kein Angebot.')])),
+    !hasFeature(s, 'reststoffe') ? null : section('Reststoffe', kv('Vorlagebehälter', `${fmt.int(tank)} von ${fmt.int(CONFIG.plant.residueTankT)} t`), ...(residues.length ? residues : [h('p', { class: 'muted' }, 'Gerade kein Angebot.')])),
     statusLine('supply'),
   );
 }
@@ -180,7 +184,7 @@ function fieldsPanel(ctx: PanelCtx): HTMLElement {
         button('Pachten', () => report('fields', ctx.act({ type: 'leaseField', fieldId: f.id })), { primary: true, key: `lease-${f.id}`, tip: TIPS.lease }));
     }
     const cropId = `crop-${f.id}`;
-    const select = h('select', { id: cropId, class: 'input', 'data-focus': cropId, 'data-tip': TIPS.crop }, ...(Object.keys(CROP_NAMES) as Crop[]).map((c) => h('option', { value: c, selected: c === f.crop }, CROP_NAMES[c]))) as HTMLSelectElement;
+    const select = h('select', { id: cropId, class: 'input', 'data-focus': cropId, 'data-tip': TIPS.crop }, ...(Object.keys(CROP_NAMES) as Crop[]).filter((c) => c !== 'zweikultur' || hasFeature(s, 'felder_experten') || f.crop === c).map((c) => h('option', { value: c, selected: c === f.crop }, CROP_NAMES[c]))) as HTMLSelectElement;
     select.addEventListener('change', () => report('fields', ctx.act({ type: 'setCrop', fieldId: f.id, crop: select.value as Crop })));
     const standing = f.standing === 'leer' ? 'nichts' : f.standing === 'zweitmais' ? 'Mais (Zweitfrucht)' : f.standing === 'mais' ? 'Mais' : 'Grünroggen';
     const win = harvestWindowFor(f);
@@ -190,9 +194,12 @@ function fieldsPanel(ctx: PanelCtx): HTMLElement {
       const planned = f.harvestDay ?? defaultHarvestDay(s, f) ?? win.start;
       const days: number[] = [];
       for (let d = Math.max(win.start, s.day); d <= Math.min(win.end, CONFIG.time.runDays - 1); d++) days.push(d);
+      const planText = h('span', {}, formatDate(planned));
       const sel = h('select', { id: hid, class: 'input', 'data-focus': hid, 'data-tip': TIPS.harvestDay }, ...days.map((d) => h('option', { value: d, selected: d === planned }, formatDate(d)))) as HTMLSelectElement;
       sel.addEventListener('change', () => report('fields', ctx.act({ type: 'setHarvestDay', fieldId: f.id, day: Number(sel.value) })));
-      harvest = h('div', { class: 'field-row' }, h('label', { for: hid }, 'Ernte ab'), days.length ? sel : h('span', {}, 'Ernte läuft'));
+      // Eigener Erntetermin nur mit vollem Funktionsumfang; sonst erntet der Betriebsleiter zum üblichen Termin
+      const choose = hasFeature(s, 'felder_experten');
+      harvest = h('div', { class: 'field-row' }, h('label', { for: hid }, 'Ernte ab'), !days.length ? h('span', {}, 'Ernte läuft') : choose ? sel : planText);
       if (f.harvestedHa > 0) harvest.append(h('span', { class: 'muted' }, `geerntet ${fmt.int(f.harvestedHa)} von ${cfg.ha} ha`));
     }
     return h('div', { class: 'card' }, head,
@@ -220,11 +227,11 @@ function techPanel(ctx: PanelCtx): HTMLElement {
       kv('Betriebsstunden gesamt', `${fmt.int(chp.operatingHours)} h`),
       row(
         button(`Kleine Wartung, ${fmt.eur(s.maintenanceContract ? 0 : C.smallService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'klein' })), { key: 'svc-small', tip: TIPS.serviceSmall }),
-        button(`Instandsetzung, ${fmt.eur(C.majorService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'gross' })), { key: 'svc-major', tip: TIPS.serviceMajor }),
+        !hasFeature(s, 'instandsetzung') ? null : button(`Instandsetzung, ${fmt.eur(C.majorService.costEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'gross' })), { key: 'svc-major', tip: TIPS.serviceMajor }),
       ),
-      h('p', { class: 'muted' }, `Stillstand: ${tech ? 1 : C.smallService.downtimeDays} bzw. ${tech ? Math.max(1, Math.round(C.majorService.downtimeDays * CONFIG.staff.technicianDowntimeFactor)) : C.majorService.downtimeDays} Tage`),
+      !hasFeature(s, 'instandsetzung') ? null : h('p', { class: 'muted' }, `Stillstand: ${tech ? 1 : C.smallService.downtimeDays} bzw. ${tech ? Math.max(1, Math.round(C.majorService.downtimeDays * CONFIG.staff.technicianDowntimeFactor)) : C.majorService.downtimeDays} Tage`),
     ),
-    section('Entschwefelung',
+    !hasFeature(s, 'entschwefelung') ? null : section('Entschwefelung',
       kv('Vorrat Verbrauchsmittel', `etwa ${fmt.int(s.desulf.mediumDays)} Tage`),
       kv('H₂S im Gas', `${fmt.int(s.desulf.cleanPpm)} ppm`),
       button(`Nachfüllen, ${fmt.eur(CONFIG.desulfurization.refillCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'entschwefelung' })), { key: 'svc-desulf', tip: TIPS.desulf }),
@@ -240,7 +247,7 @@ function techPanel(ctx: PanelCtx): HTMLElement {
 
 function staffPanel(ctx: PanelCtx): HTMLElement {
   const s = ctx.state;
-  const rows = STAFF_ROLES.map((role) => {
+  const rows = STAFF_ROLES.filter((role) => roleAvailable(s, role)).map((role) => {
     const m = s.staff.find((x) => x.role === role);
     const cost = CONFIG.staff.roles[role].salaryEurPerMonth;
     const status = !m ? null : s.day - m.hiredDay < CONFIG.staff.onboardingDays ? `Einarbeitung bis ${formatDate(m.hiredDay + CONFIG.staff.onboardingDays)}` : `dabei seit ${formatDate(m.hiredDay)}`;
@@ -290,7 +297,7 @@ function digestatePanel(ctx: PanelCtx): HTMLElement {
 
 function buildPanel(ctx: PanelCtx): HTMLElement {
   const s = ctx.state;
-  const kinds = Object.keys(BUILD_NAMES) as BuildKind[];
+  const kinds = (Object.keys(BUILD_NAMES) as BuildKind[]).filter((k) => buildAvailable(s, k));
   const rows = kinds.map((k) => {
     const cfg = CONFIG.builds[k];
     const cost = k === 'cover' && s.unlocks.includes('abdeckung_guenstig') ? CONFIG.builds.cover.costEurUnlocked : cfg.costEur;
@@ -352,9 +359,9 @@ function financePanel(ctx: PanelCtx): HTMLElement {
 export const PANELS: PanelDef[] = [
   { id: 'feed', title: 'Fütterung', icon: 'feed', key: 'f', render: feedPanel },
   { id: 'supply', title: 'Beschaffung', icon: 'truck', key: 'b', render: supplyPanel },
-  { id: 'fields', title: 'Felder', icon: 'field', key: 'a', render: fieldsPanel },
+  { id: 'fields', title: 'Felder', icon: 'field', key: 'a', render: fieldsPanel, available: (s) => hasFeature(s, 'felder') },
   { id: 'tech', title: 'Technik', icon: 'wrench', key: 't', render: techPanel },
-  { id: 'staff', title: 'Personal', icon: 'users', key: 'p', render: staffPanel },
+  { id: 'staff', title: 'Personal', icon: 'users', key: 'p', render: staffPanel, available: (s) => hasFeature(s, 'personal') },
   { id: 'dig', title: 'Gärrest', icon: 'droplet', key: 'g', render: digestatePanel },
   { id: 'build', title: 'Ausbau und Dorf', icon: 'build', key: 'u', render: buildPanel },
   { id: 'money', title: 'Finanzen', icon: 'coins', key: 'k', render: financePanel },

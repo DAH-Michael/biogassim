@@ -721,16 +721,20 @@ export const CONFIG = {
       /** Netzausfall und Rührwerksstörung je Tag (nur in Real) */
       gridOutagePerDay: 0,
       stirrerFailurePerDay: 0,
+      /** Verfügbare Funktionen dieser Stufe (Schlüssel siehe FEATURES unten) */
+      features: [] as readonly Feature[],
     },
     normal: {
       traceElements: true, shiftStressFactor: 1, growthFactor: 1, measurement: 'external' as 'lab' | 'external' | 'slow',
       chpFailureFactor: 1, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1, residueSigmaFactor: 1,
       droughtChance: 0.15, gridOutagePerDay: 0, stirrerFailurePerDay: 0,
+      features: ['entschwefelung', 'reststoffe', 'felder', 'instandsetzung', 'ausbau_erweitert', 'personal'] as readonly Feature[],
     },
     real: {
       traceElements: true, shiftStressFactor: 1.3, growthFactor: 0.85, measurement: 'slow' as 'lab' | 'external' | 'slow',
       chpFailureFactor: 1.4, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1.5, residueSigmaFactor: 1.3,
       droughtChance: 0.25, gridOutagePerDay: 0.004, stirrerFailurePerDay: 0.003,
+      features: ['entschwefelung', 'reststoffe', 'felder', 'instandsetzung', 'ausbau_erweitert', 'personal', 'personal_experten', 'felder_experten'] as readonly Feature[],
     },
   },
   /** Netzausfall: BHKW steht, Dauer in Tagen. Rührwerksstörung: halbe Feststoffzufuhr, Tage und Kosten. Richtwert, fachlich prüfen */
@@ -817,6 +821,20 @@ export const CONFIG = {
     minRelativeWeight: 0.15,
   },
 } as const;
+
+/**
+ * Funktionen, die je nach Schwierigkeitsgrad verfügbar sind. Grundfunktionen (Fütterung, Verträge,
+ * Gülle, Nachkauf, kleine Wartung, Ausbringung, Gärrestlager, Abdeckung, Wärmeleitung) gibt es immer.
+ */
+export type Feature =
+  | 'entschwefelung' // Verbrauchsmittel nachfüllen, H2S-Verschleiß
+  | 'reststoffe' // Reststoffmarkt
+  | 'felder' // Felder pachten, Kultur Mais oder Grünroggen
+  | 'felder_experten' // Zweikultur, eigener Erntetermin
+  | 'instandsetzung' // große Instandsetzung des BHKW
+  | 'ausbau_erweitert' // größerer Gasspeicher, zweites Fahrsilo
+  | 'personal' // Biologin, Verfahrenstechniker
+  | 'personal_experten'; // Agrarberaterin, Energievermarkter
 
 export interface SubstrateConfig {
   ts: number;

@@ -4,7 +4,7 @@ import { logEvent } from './eventlog';
 import { round } from './biology';
 import { chance, intRange, lognormalMean1, range } from './rng';
 import { say } from './messages';
-import { difficulty } from './difficulty';
+import { difficulty, hasFeature } from './difficulty';
 import { hasStaff, ledger, type SiloDelivery } from './storage';
 import type { GameState } from './types';
 
@@ -140,7 +140,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
 
   // Reststoffmarkt
   state.residueOffers = state.residueOffers.filter((o) => o.expiresDay >= day);
-  if (day >= state.nextOfferDay) {
+  if (day >= state.nextOfferDay && hasFeature(state, 'reststoffe')) {
     const r = state.rng.market;
     const priceEurPerT = Math.round(range(r, R.priceEurPerT[0], R.priceEurPerT[1]));
     state.residueOffers.push({
