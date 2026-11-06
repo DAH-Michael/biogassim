@@ -212,13 +212,22 @@ input.input { width: 96px; }
 }
 @keyframes metric-pulse { 50% { opacity: .35; } }
 
-/* Meldungen aus der Welt */
-.ticker {
+/* Meldungen aus der Welt: Stapel unten in der Mitte, neue Meldungen schieben die vorigen nach oben */
+.tickers {
   position: absolute;
   left: 50%;
   bottom: var(--space-3);
   transform: translateX(-50%);
   width: min(560px, calc(100% - 2 * var(--space-3)));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  z-index: 1;
+  pointer-events: none;
+}
+.ticker {
+  pointer-events: auto;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
@@ -227,9 +236,10 @@ input.input { width: 96px; }
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  z-index: 1;
+  transition: transform .38s var(--ease-out), opacity .3s ease;
 }
-.ticker[hidden] { display: none; }
+.ticker.is-entering { opacity: 0; transform: translateY(18px) scale(.98); }
+.ticker.is-leaving { opacity: 0; transform: scale(.96); pointer-events: none; }
 .ticker__icon { color: var(--dunkelgruen); padding-top: 2px; }
 .ticker__content { flex: 1; min-width: 0; }
 .ticker__head { display: flex; gap: var(--space-2); align-items: baseline; }
@@ -372,9 +382,8 @@ input.code__input { width: 9.5em; }
 .score--failed .score__chips li { border-color: var(--k20); }
 
 /* DAH-Beraterin (Tutorial) */
-.advisor { position: absolute; left: var(--space-3); bottom: var(--space-3); z-index: 2; width: min(460px, calc(100% - 2 * var(--space-3))); display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); background: var(--white); border: 2px solid var(--dunkelgruen); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.advisor { position: absolute; right: var(--space-3); top: var(--space-3); z-index: 2; width: min(460px, calc(100% - 2 * var(--space-3))); display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); background: var(--white); border: 2px solid var(--dunkelgruen); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
 .advisor[hidden] { display: none; }
-.stage:has(.drawer:not([hidden])) .advisor { left: calc(400px + 2 * var(--space-3)); width: min(420px, calc(100% - 420px - 3 * var(--space-3))); }
 .advisor__portrait { flex: none; }
 .advisor__body { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .advisor__name { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--dunkelgruen); }
@@ -459,7 +468,7 @@ input.code__input { width: 9.5em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
 /* Anlagenname, Verlauf-Knopf und Verlaufsansicht */
@@ -497,3 +506,44 @@ input.code__input { width: 9.5em; }
 .realworld { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); }
 .realworld__item { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--line); border-left: 4px solid var(--hellgruen); border-radius: var(--radius-xs); background: var(--bg-muted); font-size: 14px; line-height: 1.5; }
 .realworld__item strong { font-family: var(--font-display); font-size: 17px; color: var(--dunkelgruen); }
+
+/* Bewegung: weiche Übergänge statt hartem Ein- und Ausblenden (siehe src/ui/motion.ts).
+   is-entering ist der Startzustand beim Einblenden, is-leaving der Endzustand beim Ausblenden;
+   während is-leaving bleibt ein Element trotz hidden sichtbar, bis der Übergang fertig ist. */
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --dur: .3s; interpolate-size: allow-keywords; }
+.is-leaving { pointer-events: none; }
+
+.drawer { transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out); }
+.drawer.is-entering, .drawer.is-leaving { opacity: 0; transform: translateX(-28px); }
+.drawer.is-leaving[hidden] { display: flex; }
+.drawer__body.is-swapping { animation: swap-in .28s var(--ease-out); }
+@keyframes swap-in { from { opacity: 0; transform: translateY(8px); } }
+
+.end { transition: opacity var(--dur) ease; }
+.end.is-entering, .end.is-leaving { opacity: 0; }
+.end.is-leaving[hidden] { display: flex; }
+.end__card { transition: transform .38s var(--ease-out), opacity .3s ease; }
+.end.is-entering .end__card, .end.is-leaving .end__card { opacity: 0; transform: translateY(20px) scale(.985); }
+
+.advisor { transition: opacity var(--dur) var(--ease-out), transform .4s var(--ease-out); }
+.advisor.is-entering, .advisor.is-leaving { opacity: 0; transform: translateX(36px); }
+.advisor.is-leaving[hidden] { display: flex; }
+
+.tip { transition: opacity .16s ease; }
+.tip.is-entering, .tip.is-leaving { opacity: 0; }
+.tip.is-leaving[hidden] { display: block; }
+
+/* Aufklappbare Abschnitte gleiten auf (wo der Browser es kann) */
+details::details-content { transition: height .32s var(--ease-out), content-visibility .32s allow-discrete; height: 0; overflow: clip; }
+details[open]::details-content { height: auto; }
+
+/* Kleinere Elemente: Zustandswechsel weich */
+.choice, .switch, .check, .card, .rail__btn, .zoom__btn, .time__btn, .stats-btn, .ticker__close, .drawer__close { transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.btn { transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .12s ease; }
+.btn:active, .time__btn:active, .zoom__btn:active, .stats-btn:active { transform: scale(.97); }
+.metric__value { transition: color .3s ease; }
+.metric__flag:not([hidden]) { animation: flag-in .3s var(--ease-out); }
+@keyframes flag-in { from { opacity: 0; transform: scale(.6); } }
+.chart-tip { transition: opacity .15s ease; }
+.chart-tip.is-entering, .chart-tip.is-leaving { opacity: 0; }
+.chart-tip.is-leaving[hidden] { display: block; }
