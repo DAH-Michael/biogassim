@@ -7,6 +7,7 @@ import { say } from './messages';
 import { hasFeature } from './difficulty';
 import { hasStaff, ledger, type SiloDelivery } from './storage';
 import type { FieldState, GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Eigene Felder: strategisch, nicht operativ. Der Spieler wählt Kultur und
@@ -17,9 +18,9 @@ const F = CONFIG.fields;
 const W = F.windows;
 
 export function fieldConfig(id: string) {
-  const cfg = F.list.find((f) => f.id === id);
-  if (!cfg) throw new Error(`Unbekanntes Feld ${id}`);
-  return cfg;
+  const spec = F.list.find((f) => f.id === id);
+  if (!spec) throw new Error(`Unbekanntes Feld ${id}`);
+  return spec;
 }
 
 /** Erntefenster als Spieltage für die aktuell stehende Kultur. */
@@ -44,14 +45,14 @@ export function fieldsDay(state: GameState): FieldDayResult {
   const weather = state.weather.days[day];
   const result: FieldDayResult = { deliveries: [], trafficTrips: 0 };
   for (const field of state.fields) {
-    const cfg = fieldConfig(field.id);
+    const spec = fieldConfig(field.id);
 
     // Vorpächter gibt die Fläche nach seiner Ernte frei
     if (field.status === 'verpachtet' && day === dayOfDate(F.leaseAvailableFrom)) {
       field.status = 'frei';
       field.standing = 'leer';
       field.growth = 0;
-      if (hasFeature(state, 'felder')) say(state, 'landwirt', 'feld_frei', { feld: cfg.name, ha: cfg.ha });
+      if (hasFeature(state, 'felder')) say(state, 'landwirt', 'feld_frei', { feld: spec.name, ha: spec.ha });
     }
     if (field.status !== 'gefuehrt') continue;
 
@@ -66,13 +67,13 @@ export function fieldsDay(state: GameState): FieldDayResult {
         field.growth = 0;
         field.harvestedHa = 0;
         state.today.sowing.push(field.id);
-        const cost = cfg.ha * (sowRye ? F.cultivationEurPerHa.gruenroggen : F.cultivationEurPerHa.mais);
+        const cost = spec.ha * (sowRye ? F.cultivationEurPerHa.gruenroggen : F.cultivationEurPerHa.mais);
         state.finance.balance -= cost;
         ledger(state, 'anbau', cost);
         logEvent(state.log, day, {
           type: 'field_sown',
           causes: [field.decisionEvent],
-          data: { field: field.id, crop: field.standing, ha: cfg.ha, costEur: Math.round(cost) },
+          data: { field: field.id, crop: field.standing, ha: spec.ha, costEur: Math.round(cost) },
         });
       }
     }
@@ -93,7 +94,7 @@ export function fieldsDay(state: GameState): FieldDayResult {
     const mustFinish = day >= lastDay;
     if (day < planned && !mustFinish) continue;
     if (weather.wet && !mustFinish) continue;
-    const remaining = cfg.ha - field.harvestedHa;
+    const remaining = spec.ha - field.harvestedHa;
     if (remaining <= 0) continue;
     const ha = mustFinish ? remaining : Math.min(remaining, F.harvestHaPerDay);
     const kind = field.standing === 'gruenroggen' ? 'gruenroggen' : 'mais';
@@ -116,17 +117,17 @@ export function fieldsDay(state: GameState): FieldDayResult {
         data: { field: field.id, crop: kind, offsetToOptimum: offset },
       }).id;
     }
-    result.deliveries.push({ kind, t, quality, source: field.harvestStartEvent, throughVillage: cfg.throughVillage, distanceKm: cfg.distanceKm, origin: field.id });
-    const transport = t * (CONFIG.contracts.silageTransportEurPerTKm * cfg.distanceKm + CONFIG.contracts.silageHandlingEurPerT);
+    result.deliveries.push({ kind, t, quality, source: field.harvestStartEvent, throughVillage: spec.throughVillage, distanceKm: spec.distanceKm, origin: field.id });
+    const transport = t * (cfg(state).contracts.silageTransportEurPerTKm * spec.distanceKm + cfg(state).contracts.silageHandlingEurPerT);
     state.finance.balance -= transport;
     ledger(state, 'transport', transport);
-    if (cfg.throughVillage) {
+    if (spec.throughVillage) {
       result.trafficTrips += Math.ceil(t / F.trailerT) * 2;
       result.trafficSource = field.harvestStartEvent;
     }
     state.harvestTotals[kind].own += t;
     field.harvestedT += t;
-    if (field.harvestedHa >= cfg.ha - CONFIG.units.epsilon) {
+    if (field.harvestedHa >= spec.ha - CONFIG.units.epsilon) {
       logEvent(state.log, day, {
         type: 'field_harvest_done',
         causes: [field.harvestStartEvent],

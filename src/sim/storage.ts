@@ -5,13 +5,12 @@ import { round } from './biology';
 import { say } from './messages';
 import { difficulty } from './difficulty';
 import type { GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Lager: Fahrsilo und Gärrestlager.
  */
 
-const S = CONFIG.silo;
-const D = CONFIG.digestate;
 
 export type SilageKind = 'mais' | 'gruenroggen';
 
@@ -30,11 +29,11 @@ export function siloCapacity(state: GameState): number {
 export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
   const silo = state.silo;
   const log = state.log;
-  decayCauses(silo.compactionCauses, S.causeHalfLifeDays);
+  decayCauses(silo.compactionCauses, cfg(state).silo.causeHalfLifeDays);
   const delivered = deliveries.reduce((a, d) => a + d.t, 0);
   silo.deliveredToday = delivered;
   if (delivered > 0) {
-    const compaction = difficulty(state).siloCompaction ? Math.min(1, S.compactionCapacityTPerDay / delivered) : 1;
+    const compaction = difficulty(state).siloCompaction ? Math.min(1, cfg(state).silo.compactionCapacityTPerDay / delivered) : 1;
     silo.compactionToday = compaction;
     silo.compactingDays++;
     let space = Math.max(0, silo.capacityT - siloStock(state));
@@ -48,13 +47,13 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
         if (d.source) overflowSources.push(d.source);
       }
       if (stored <= 0) continue;
-      const q = d.quality * (1 - S.compactionQualityWeight * (1 - compaction));
+      const q = d.quality * (1 - cfg(state).silo.compactionQualityWeight * (1 - compaction));
       const stock = silo[d.kind];
       stock.quality = (stock.quality * stock.t + q * stored) / (stock.t + stored);
       stock.t += stored;
       if (compaction < 1) addCause(silo.compactionCauses, d.source, d.t * (1 - compaction));
     }
-    if (compaction < S.poorCompactionThreshold && !silo.poorCompactionEvent) {
+    if (compaction < cfg(state).silo.poorCompactionThreshold && !silo.poorCompactionEvent) {
       const ev = logEvent(log, state.day, {
         type: 'silo_compaction_poor',
         severity: 'warning',
@@ -65,8 +64,8 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
     }
     if (overflowT > 0) {
       state.today.siloSoldT += overflowT;
-      state.finance.balance += overflowT * S.overflowSalePricePerT;
-      state.finance.ledger.silageSold = (state.finance.ledger.silageSold ?? 0) + overflowT * S.overflowSalePricePerT;
+      state.finance.balance += overflowT * cfg(state).silo.overflowSalePricePerT;
+      state.finance.ledger.silageSold = (state.finance.ledger.silageSold ?? 0) + overflowT * cfg(state).silo.overflowSalePricePerT;
       if (!silo.overflowEvent) {
         const ev = logEvent(log, state.day, {
           type: 'silo_overflow',
@@ -86,14 +85,14 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
   // Lagerverluste
   for (const kind of ['mais', 'gruenroggen'] as const) {
     const stock = silo[kind];
-    const rate = (S.baseLossPerYear + (1 - stock.quality) * S.poorCompactionLossPerYear) / CONFIG.units.daysPerYear;
+    const rate = (cfg(state).silo.baseLossPerYear + (1 - stock.quality) * cfg(state).silo.poorCompactionLossPerYear) / CONFIG.units.daysPerYear;
     stock.t = Math.max(0, stock.t * (1 - rate));
   }
 }
 
 /** Methanpotenzial-Faktor aus der Silagequalität. */
 export function silageCh4Factor(quality: number): number {
-  return 1 - (1 - quality) * S.qualityCh4Penalty;
+  return 1 - (1 - quality) * CONFIG.silo.qualityCh4Penalty;
 }
 
 /** Gärrestlager: Zufluss, Regen, Nachgasen, Ausbringung, Sperrfrist, Überlauf. */
@@ -102,44 +101,44 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
   const log = state.log;
   const day = state.day;
   const weather = state.weather.days[day];
-  decayCauses(dg.inflowCauses, D.causeHalfLifeDays);
+  decayCauses(dg.inflowCauses, cfg(state).digestate.causeHalfLifeDays);
 
   // Zufluss
-  const inflow = digestateT * CONFIG.plant.inputVolumeM3PerT;
+  const inflow = digestateT * cfg(state).plant.inputVolumeM3PerT;
   dg.m3 += inflow;
   addCause(dg.inflowCauses, state.feedTargetEvent ?? state.origin.feeding, inflow);
   dg.rainToday = 0;
   if (!dg.covered && weather.rainMm > 0) {
-    dg.rainToday = weather.rainMm * dg.capacityM3 * CONFIG.plant.digestateAreaPerM3 * D.rainM3PerM2PerMm;
+    dg.rainToday = weather.rainMm * dg.capacityM3 * cfg(state).plant.digestateAreaPerM3 * cfg(state).digestate.rainM3PerM2PerMm;
     dg.m3 += dg.rainToday;
     addCause(dg.inflowCauses, state.origin.openStorage, dg.rainToday);
   }
 
   // Nachgasen: offen geht es verloren, abgedeckt wird es aufgefangen
   dg.residualCh4 += residualCh4;
-  const [tMin, tMax] = D.residualTempFactorRange;
-  const tf = Math.min(tMax, Math.max(tMin, ambientC / D.residualGasRefC));
-  const released = dg.residualCh4 * D.residualGasPerDay * tf;
+  const [tMin, tMax] = cfg(state).digestate.residualTempFactorRange;
+  const tf = Math.min(tMax, Math.max(tMin, ambientC / cfg(state).digestate.residualGasRefC));
+  const released = dg.residualCh4 * cfg(state).digestate.residualGasPerDay * tf;
   dg.residualCh4 -= released;
   let capturedCh4 = 0;
   if (dg.covered) capturedCh4 = released;
   else state.totals.ch4LostStorageM3 += released;
 
   // Ausbringung
-  const blackout = inWindow(day, D.blackout);
+  const blackout = inWindow(day, cfg(state).digestate.blackout);
   const fieldsOk = !weather.wet && !weather.frost;
   let demand = 0;
   if (!blackout && fieldsOk) {
-    for (const r of D.regionalDemand) if (inWindow(day, r.window)) demand += r.m3PerDay;
+    for (const r of cfg(state).digestate.regionalDemand) if (inWindow(day, r.window)) demand += r.m3PerDay;
     if (hasStaff(state, 'agrar')) demand *= 1 + CONFIG.staff.advisorDemandBonus;
     demand += ownFieldDemand(state);
   }
   // Nachfrage vor der Sperrfrist mitschreiben
-  const bStart = dayOfDate(D.blackout.from);
-  if (day < bStart) dg.demandBeforeBlackout += Math.min(demand, D.spreadCapacityM3PerDay);
+  const bStart = dayOfDate(cfg(state).digestate.blackout.from);
+  if (day < bStart) dg.demandBeforeBlackout += Math.min(demand, cfg(state).digestate.spreadCapacityM3PerDay);
   dg.spreadToday = 0;
   if (dg.spreadOrderM3 > 0 && demand > 0) {
-    const amount = Math.min(dg.spreadOrderM3, demand, D.spreadCapacityM3PerDay, dg.m3);
+    const amount = Math.min(dg.spreadOrderM3, demand, cfg(state).digestate.spreadCapacityM3PerDay, dg.m3);
     if (amount > 0) {
       dg.m3 -= amount;
       dg.spreadOrderM3 -= amount;
@@ -147,7 +146,7 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
       dg.spreadTotal += amount;
       if (day < bStart) dg.spreadBeforeBlackout += amount;
       applyOwnFieldDigestate(state, amount);
-      const cost = amount * (D.spreadCostPerM3 + D.spreadCostPerM3Km * D.regionalDistanceKm);
+      const cost = amount * (cfg(state).digestate.spreadCostPerM3 + cfg(state).digestate.spreadCostPerM3Km * cfg(state).digestate.regionalDistanceKm);
       state.finance.balance -= cost;
       ledger(state, 'gaerrest', cost);
     }
@@ -155,12 +154,12 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
   // Abnahmeverträge (Freischaltung): Abgabe an Betriebe mit eigenem Lager, ganzjährig
   dg.offtakeToday = 0;
   if (dg.offtake) {
-    const amount = Math.min(D.offtake.m3PerDay, dg.m3);
+    const amount = Math.min(cfg(state).digestate.offtake.m3PerDay, dg.m3);
     dg.offtakeToday = amount;
     dg.m3 -= amount;
     dg.spreadToday += amount;
     dg.spreadTotal += amount;
-    const cost = amount * D.offtake.costPerM3;
+    const cost = amount * cfg(state).digestate.offtake.costPerM3;
     state.finance.balance -= cost;
     ledger(state, 'gaerrest', cost);
   }
@@ -171,13 +170,13 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
     const used = dg.demandBeforeBlackout > 0 ? dg.spreadBeforeBlackout / dg.demandBeforeBlackout : 1;
     const summary = logEvent(log, day, {
       type: 'spreading_before_blackout',
-      severity: used < D.blackoutUsedShare ? 'warning' : 'info',
+      severity: used < cfg(state).digestate.blackoutUsedShare ? 'warning' : 'info',
       playerDecision: true,
       causes: [],
       data: { spreadM3: Math.round(dg.spreadBeforeBlackout), possibleM3: Math.round(dg.demandBeforeBlackout), fillShare: round(share, 2) },
     });
-    if (share >= D.blackoutStartHighShare) {
-      const causes = used < D.blackoutUsedShare ? [summary.id, state.origin.storage] : [state.origin.storage, summary.id];
+    if (share >= cfg(state).digestate.blackoutStartHighShare) {
+      const causes = used < cfg(state).digestate.blackoutUsedShare ? [summary.id, state.origin.storage] : [state.origin.storage, summary.id];
       const ev = logEvent(log, day, {
         type: 'blackout_start_high',
         severity: 'warning',
@@ -190,11 +189,11 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
 
   // Hoher Füllstand
   const share = dg.m3 / dg.capacityM3;
-  if (share >= D.highShare && !dg.highEvent) {
+  if (share >= cfg(state).digestate.highShare && !dg.highEvent) {
     // In der Sperrfrist: voller Start (falls vorhanden), sonst die zu kleine Lagerkapazität, dann der Zufluss
-    const startVolume = (Object.values(CONFIG.feeding.start) as number[]).reduce((x, y) => x + y, 0);
+    const startVolume = (Object.values(cfg(state).feeding.start) as number[]).reduce((x, y) => x + y, 0);
     const nowVolume = Object.values(state.feedTarget).reduce((x, y) => x + y, 0);
-    const volumeUp = nowVolume > startVolume * (1 + D.volumeIncreaseShare);
+    const volumeUp = nowVolume > startVolume * (1 + cfg(state).digestate.volumeIncreaseShare);
     const structural = blackout ? [dg.blackoutEvent ?? state.origin.storage] : [];
     const causes = volumeUp ? [...topCauses(dg.inflowCauses), ...structural] : [...structural, ...topCauses(dg.inflowCauses)];
     const ev = logEvent(log, day, {
@@ -205,7 +204,7 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
     });
     dg.highEvent = ev.id;
     say(state, 'betriebsleiter', 'gaerrest_hoch', { prozent: Math.round(share * CONFIG.units.percent) }, ev.id);
-  } else if (share < D.highShare - D.highHysteresis && dg.highEvent) {
+  } else if (share < cfg(state).digestate.highShare - cfg(state).digestate.highHysteresis && dg.highEvent) {
     dg.highEvent = undefined;
   }
 

@@ -790,11 +790,64 @@ export const CONFIG = {
   },
 
   /** Startszenarien. Faktoren wirken auf Gülleangebot, Transportwege, Verkehrstoleranz und Akzeptanz. */
+  /**
+   * Szenarien. `plant` beschreibt die Anlage:
+   * scale: Größe relativ zur Altanlage (Fermenter, Lager, Silo, Gasspeicher, Fütterung, Verträge, Gülle, Konto);
+   * chpKwEl: BHKW-Leistung (0 = kein BHKW); upgradingRawM3PerH: Gasaufbereitung, m³ Rohbiogas pro Stunde
+   * (0 = keine); boiler: Heizkessel für die Fermenterheizung, wenn die BHKW-Wärme nicht reicht.
+   * Richtwert, fachlich prüfen
+   */
   scenarios: {
-    altanlage: { fieldsOwned: false, guelleSupply: 1, guelleDistance: 1, trafficTolerance: 1, acceptanceStart: 0, acceptanceBaseline: 0 },
-    eigene_felder: { fieldsOwned: true, guelleSupply: 1, guelleDistance: 1, trafficTolerance: 1, acceptanceStart: 0, acceptanceBaseline: 0 },
-    /** Schwieriger Standort: weniger und entferntere Gülle, Dorf näher an der Zufahrt. Richtwert */
-    schwieriger_standort: { fieldsOwned: false, guelleSupply: 0.7, guelleDistance: 1.4, trafficTolerance: 0.6, acceptanceStart: -10, acceptanceBaseline: -5 },
+    /** Altanlage: BHKW 500 kW, Strom nach EEG */
+    altanlage: { fieldsOwned: false, guelleSupply: 1, guelleDistance: 1, trafficTolerance: 1, acceptanceStart: 0, acceptanceBaseline: 0,
+      plant: { scale: 1, chpKwEl: 500, upgradingRawM3PerH: 0, boiler: false } },
+    /** Biomethananlage mit eigenen Feldern: nur Gasaufbereitung, kein BHKW, rund 1,8-fach so groß */
+    eigene_felder: { fieldsOwned: true, guelleSupply: 1, guelleDistance: 1, trafficTolerance: 1, acceptanceStart: 0, acceptanceBaseline: 0,
+      plant: { scale: 1.8, chpKwEl: 0, upgradingRawM3PerH: 450, boiler: true } },
+    /** Verbundanlage am schwierigen Standort: BHKW und Gasaufbereitung, rund 2,6-fach so groß; weniger und entferntere Gülle, Dorf näher an der Zufahrt */
+    schwieriger_standort: { fieldsOwned: false, guelleSupply: 0.7, guelleDistance: 1.4, trafficTolerance: 0.6, acceptanceStart: -10, acceptanceBaseline: -5,
+      plant: { scale: 2.6, chpKwEl: 500, upgradingRawM3PerH: 400, boiler: true } },
+  },
+
+  /**
+   * Wie Mengen und Kosten mit der Anlagengröße wachsen. Mengen wachsen linear, Investitionen und
+   * Fixkosten unterproportional (Größenvorteil), die Verkehrstoleranz des Dorfs mit der Wurzel.
+   * Richtwert, fachlich prüfen
+   */
+  scaling: {
+    costExponent: 0.8,
+    trafficToleranceExponent: 0.5,
+  },
+
+  /**
+   * Gasaufbereitung (Membranverfahren) mit Einspeisung ins Erdgasnetz. Richtwert, fachlich prüfen
+   */
+  upgrading: {
+    /** Strombedarf je m³ Rohbiogas (Verdichtung, Gastrocknung, Einspeiseverdichter), kWh */
+    powerKwhPerRawM3: 0.25,
+    /** Methanschlupf: Anteil des Methans, der mit dem Abgas entweicht */
+    methaneSlip: 0.005,
+    /** Erlös für Biomethan, €/kWh (Heizwert), fester Abnahmevertrag */
+    biomethaneEurPerKwh: 0.10,
+    /** Erlös, wenn der Maisdeckel verletzt ist (Erdgaspreisniveau, ohne Nachhaltigkeitsaufschlag), €/kWh */
+    biomethaneCapPenaltyEurPerKwh: 0.045,
+    /** Wartung der Verdichter */
+    serviceIntervalH: 4000,
+    serviceNoticeHoursBefore: 300,
+    serviceCostEur: 7000,
+    serviceDowntimeDays: 1,
+    startHoursSinceService: 1500,
+    /** Störungen: Grundwahrscheinlichkeit pro Betriebstag, Zuschlag bei überfälliger Wartung und Schwefel */
+    failureBasePerDay: 0.006,
+    failureOverdueFactor: 3,
+    failureDowntimeDays: [1, 3] as const,
+    failureRepairEur: [4000, 12000] as const,
+    /** Schwefel schädigt die Membranen: Faktor auf die Störungswahrscheinlichkeit je 100 ppm Reingas */
+    h2sFailurePer100ppm: 0.5,
+    /** Einspeisestopp durch den Netzbetreiber (nur Stufe Real), Tage */
+    gridStopDays: 2,
+    /** Heizkessel: Wirkungsgrad */
+    boilerEta: 0.9,
   },
 
   /** Ausbauten: Kosten, Bauzeit, Wirkung. Richtwert, fachlich prüfen */
@@ -811,6 +864,8 @@ export const CONFIG = {
   /** Wartungsvertrag (Freischaltung) */
   maintenanceContract: {
     eurPerMonth: 2800,
+    /** Aufschlag, wenn auch die Gasaufbereitung abgedeckt ist, €/Monat. Richtwert, fachlich prüfen */
+    upgradingEurPerMonth: 1800,
     failureFactor: 0.7,
     repairCoverShare: 0.5,
   },

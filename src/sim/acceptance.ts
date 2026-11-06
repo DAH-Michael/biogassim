@@ -3,8 +3,9 @@ import { addCause, decayCauses, logEvent, topCauses, type CauseTracker } from '.
 import { round } from './biology';
 import { chance } from './rng';
 import { say } from './messages';
-import { chpCh4PerDay } from './tech';
+import { plantCh4PerDay } from './tech';
 import type { GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Akzeptanz im Dorf. Sinkt durch Geruch, Verkehr, Fackel und Wärmeausfall,
@@ -12,7 +13,6 @@ import type { GameState } from './types';
  * Bürgerdialog steigt.
  */
 
-const A = CONFIG.acceptance;
 
 export interface AcceptanceInput {
   trafficTrips: number;
@@ -27,7 +27,7 @@ export function acceptanceDay(state: GameState, inp: AcceptanceInput): void {
   const acc = state.acceptance;
   const day = state.day;
   const log = state.log;
-  decayCauses(acc.causes, A.causeHalfLifeDays);
+  decayCauses(acc.causes, cfg(state).acceptance.causeHalfLifeDays);
 
   const today: CauseTracker = {};
   const topicLoss: Record<Topic, number> = { geruch: 0, verkehr: 0, fackel: 0, waerme: 0 };
@@ -41,39 +41,39 @@ export function acceptanceDay(state: GameState, inp: AcceptanceInput): void {
   // Geruch
   const dg = state.digestate;
   const fill = dg.m3 / dg.capacityM3;
-  if (!dg.covered) add('geruch', A.smell.openDigestate * clamp01(fill), dg.highEvent ?? state.origin.openStorage);
-  const residualRel = inp.residualLostCh4 / (chpCh4PerDay() * A.residualGasReference);
-  add('geruch', A.smell.residualGas * clamp01(residualRel), state.origin.openStorage);
+  if (!dg.covered) add('geruch', cfg(state).acceptance.smell.openDigestate * clamp01(fill), dg.highEvent ?? state.origin.openStorage);
+  const residualRel = inp.residualLostCh4 / (plantCh4PerDay(state) * cfg(state).acceptance.residualGasReference);
+  add('geruch', cfg(state).acceptance.smell.residualGas * clamp01(residualRel), state.origin.openStorage);
   const siloQ = siloQuality(state);
-  if (siloQ !== null) add('geruch', A.smell.silageLoss * clamp01((A.silageGoodQuality - siloQ) * A.silageLossScale), state.silo.qualityEvent ?? state.silo.poorCompactionEvent ?? state.origin.silo);
+  if (siloQ !== null) add('geruch', cfg(state).acceptance.smell.silageLoss * clamp01((cfg(state).acceptance.silageGoodQuality - siloQ) * cfg(state).acceptance.silageLossScale), state.silo.qualityEvent ?? state.silo.poorCompactionEvent ?? state.origin.silo);
   const bio = state.bio;
   if (bio.fosTac > CONFIG.biology.fosTacWarning) {
-    add('geruch', A.smell.processUpset * clamp01((bio.fosTac - CONFIG.biology.fosTacNormal) / CONFIG.biology.fosTacNormal), bio.tippedEvent ?? bio.fosLevelEvent);
+    add('geruch', cfg(state).acceptance.smell.processUpset * clamp01((bio.fosTac - CONFIG.biology.fosTacNormal) / CONFIG.biology.fosTacNormal), bio.tippedEvent ?? bio.fosLevelEvent);
   }
-  if (state.residueDeliveredToday) add('geruch', A.smell.residueDelivery, state.residueDeliveredToday);
-  if (dg.spreadToday > 0) add('geruch', A.smell.spreading * clamp01(dg.spreadToday / CONFIG.digestate.spreadCapacityM3PerDay), dg.spreadOrderEvent);
+  if (state.residueDeliveredToday) add('geruch', cfg(state).acceptance.smell.residueDelivery, state.residueDeliveredToday);
+  if (dg.spreadToday > 0) add('geruch', cfg(state).acceptance.smell.spreading * clamp01(dg.spreadToday / cfg(state).digestate.spreadCapacityM3PerDay), dg.spreadOrderEvent);
 
   // Verkehr
   acc.trafficTrips = inp.trafficTrips;
   state.totals.trafficTrips += inp.trafficTrips;
-  const tolerance = A.trafficTolerance * state.scenarioFactors.trafficTolerance;
-  add('verkehr', Math.max(0, inp.trafficTrips - tolerance) * A.trafficPerTrip, inp.trafficSource);
+  const tolerance = cfg(state).acceptance.trafficTolerance * state.scenarioFactors.trafficTolerance;
+  add('verkehr', Math.max(0, inp.trafficTrips - tolerance) * cfg(state).acceptance.trafficPerTrip, inp.trafficSource);
 
   // Fackel
-  if (state.gas.flaredToday > 0) add('fackel', A.flarePerDay, state.gas.flareEvent);
+  if (state.gas.flaredToday > 0) add('fackel', cfg(state).acceptance.flarePerDay, state.gas.flareEvent);
 
   // Wärmeausfall
-  if (inp.heatOutage) add('waerme', A.heatOutagePerDay, state.chp.downEvent);
+  if (inp.heatOutage) add('waerme', cfg(state).acceptance.heatOutagePerDay, state.chp.downEvent);
 
   const loss = topicLoss.geruch + topicLoss.verkehr + topicLoss.fackel + topicLoss.waerme;
   acc.smell = topicLoss.geruch;
   acc.nuisance = loss;
-  const baseline = A.baseline + acc.baselineBonus + (state.heatLineActive ? A.heatBaselineBonus : 0) + state.scenarioFactors.acceptanceBaseline;
-  acc.value = Math.max(0, Math.min(100, acc.value + A.recoveryPerDay * (baseline - acc.value) - loss));
+  const baseline = cfg(state).acceptance.baseline + acc.baselineBonus + (state.heatLineActive ? cfg(state).acceptance.heatBaselineBonus : 0) + state.scenarioFactors.acceptanceBaseline;
+  acc.value = Math.max(0, Math.min(100, acc.value + cfg(state).acceptance.recoveryPerDay * (baseline - acc.value) - loss));
 
   // Beschwerden
-  if (loss > A.complaintThreshold && day - acc.lastComplaintDay >= A.complaintCooldownDays) {
-    if (chance(state.rng.village, (loss - A.complaintThreshold) * A.complaintChancePerPoint)) {
+  if (loss > cfg(state).acceptance.complaintThreshold && day - acc.lastComplaintDay >= cfg(state).acceptance.complaintCooldownDays) {
+    if (chance(state.rng.village, (loss - cfg(state).acceptance.complaintThreshold) * cfg(state).acceptance.complaintChancePerPoint)) {
       const topic = (Object.entries(topicLoss) as [Topic, number][]).sort((a, b) => b[1] - a[1])[0][0];
       const ev = logEvent(log, day, {
         type: 'complaint',
@@ -86,7 +86,7 @@ export function acceptanceDay(state: GameState, inp: AcceptanceInput): void {
       acc.lastComplaintDay = day;
       say(state, 'nachbar', `beschwerde_${topic}`, {}, ev.id);
       const recent = recentComplaints(state);
-      if (recent.length >= A.authorityNoticeComplaints && !acc.authorityNotified) {
+      if (recent.length >= cfg(state).acceptance.authorityNoticeComplaints && !acc.authorityNotified) {
         acc.authorityNotified = true;
         const nev = logEvent(log, day, {
           type: 'authority_notice',
@@ -101,7 +101,7 @@ export function acceptanceDay(state: GameState, inp: AcceptanceInput): void {
   }
 
   // Stufen
-  const level: 0 | 1 | 2 = acc.value < A.criticalLevel ? 2 : acc.value < A.warningLevel ? 1 : 0;
+  const level: 0 | 1 | 2 = acc.value < cfg(state).acceptance.criticalLevel ? 2 : acc.value < cfg(state).acceptance.warningLevel ? 1 : 0;
   if (level > acc.level) {
     const ev = logEvent(log, day, {
       type: level === 2 ? 'acceptance_critical' : 'acceptance_low',
@@ -111,7 +111,7 @@ export function acceptanceDay(state: GameState, inp: AcceptanceInput): void {
     });
     acc.level = level;
     acc.levelEvent = ev.id;
-  } else if (level < acc.level && acc.value > (level === 0 ? A.warningLevel : A.criticalLevel) + A.levelHysteresis) {
+  } else if (level < acc.level && acc.value > (level === 0 ? cfg(state).acceptance.warningLevel : cfg(state).acceptance.criticalLevel) + cfg(state).acceptance.levelHysteresis) {
     acc.level = level;
     if (level === 0) acc.levelEvent = undefined;
   }
@@ -122,7 +122,7 @@ export function recentComplaints(state: GameState): string[] {
   const acc = state.acceptance;
   const out: string[] = [];
   acc.complaints.forEach((d, i) => {
-    if (state.day - d <= A.shutdownComplaintWindowDays) out.push(acc.complaintEvents[i]);
+    if (state.day - d <= cfg(state).acceptance.shutdownComplaintWindowDays) out.push(acc.complaintEvents[i]);
   });
   return out;
 }

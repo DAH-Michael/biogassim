@@ -23,6 +23,10 @@ export function zeroMap(): SubstrateMap {
   return { mais: 0, gruenroggen: 0, guelle: 0, reststoff: 0 };
 }
 
+export function scaleMap(m: SubstrateMap, f: number): SubstrateMap {
+  return { mais: m.mais * f, gruenroggen: m.gruenroggen * f, guelle: m.guelle * f, reststoff: m.reststoff * f };
+}
+
 export function sumMap(m: SubstrateMap): number {
   return SUBSTRATES.reduce((a, s) => a + m[s], 0);
 }
@@ -134,6 +138,12 @@ export interface BioOutput {
   mismatch: number;
 }
 
+/** Heizbedarf des Fermenters als Anteil der Wärme einer Referenzanlage bei Volllast. */
+export function heatNeedShare(ambientC: number): number {
+  const H = CONFIG.heat;
+  return H.needShareAt15C + H.needSharePerDegree * Math.max(0, H.needReferenceC - ambientC);
+}
+
 /** Ein Tag Biologie ohne Ereignisse (auch für die Vorlaufsimulation). */
 export function bioCore(bio: BiologyState, inp: BioInput): BioOutput {
   const V = P.fermenterVolumeM3;
@@ -145,7 +155,7 @@ export function bioCore(bio: BiologyState, inp: BioInput): BioOutput {
 
   // Temperatur
   const H = CONFIG.heat;
-  const need = H.needShareAt15C + H.needSharePerDegree * Math.max(0, H.needReferenceC - inp.ambientC);
+  const need = heatNeedShare(inp.ambientC);
   if (inp.heatShare >= need) {
     if (bio.tempC < B.setpointC) bio.tempC = Math.min(B.setpointC, bio.tempC + H.heatUpPerDayC);
     else bio.tempC = Math.max(B.setpointC, bio.tempC - H.heatUpPerDayC);

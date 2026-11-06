@@ -7,6 +7,7 @@ import { say } from './messages';
 import { hasStaff, ledger, silageCh4Factor } from './storage';
 import { takeGuelle } from './contracts';
 import type { GameState, SubstrateMap } from './types';
+import { cfg } from './plant';
 
 /**
  * Fütterung: Sollwerte des Spielers, begrenzt durch Vorräte und Lieferungen.
@@ -59,7 +60,7 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
   // Störstoffe: halbe Feststoffzufuhr
   let changeCause: string | undefined = playerChangedToday ? state.feedTargetEvent : undefined;
   if (day < state.contaminationUntilDay) {
-    for (const s of ['mais', 'gruenroggen', 'reststoff'] as const) want[s] *= CONFIG.residues.contaminantFeedFactor;
+    for (const s of ['mais', 'gruenroggen', 'reststoff'] as const) want[s] *= cfg(state).residues.contaminantFeedFactor;
     if (day === state.contaminationStartDay) changeCause = state.contaminationEvent;
   }
 
@@ -74,7 +75,7 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
     ch4PerT[kind] = CONFIG.substrates[kind].ch4PerT * silageCh4Factor(stock.quality);
     stock.t -= fed[kind];
     const empty = state.silo.emptyEvent ?? (state.silo.emptyEvent = {});
-    if (want[kind] > 0 && fed[kind] < want[kind] - CONFIG.feeding.shortageToleranceT) {
+    if (want[kind] > 0 && fed[kind] < want[kind] - cfg(state).feeding.shortageToleranceT) {
       if (!empty[kind]) {
         const summary = kind === 'mais' ? state.silo.harvestSummaryEvent : state.silo.ryeSummaryEvent;
         const supply = kind === 'mais' ? state.supplyEvents.maizeContracts : state.supplyEvents.ryeContracts;
@@ -88,7 +89,7 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
         changeCause = changeCause ?? ev.id;
         say(state, 'betriebsleiter', 'silo_leer', { kind }, ev.id);
       }
-    } else if (empty[kind] && stock.t > want[kind] * CONFIG.feeding.refillDays) {
+    } else if (empty[kind] && stock.t > want[kind] * cfg(state).feeding.refillDays) {
       empty[kind] = undefined;
     }
   }
@@ -105,8 +106,8 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
       const ev = logEvent(log, day, { type: 'residue_lot_started', causes: [lot.eventId], data: { tonnes: lot.tonnes } });
       changeCause = changeCause ?? ev.id;
       if (lot.contaminated) {
-        const days = CONFIG.residues.contaminantDays;
-        const cost = Math.round(range(state.rng.tech, CONFIG.residues.contaminantRepairEur[0], CONFIG.residues.contaminantRepairEur[1]));
+        const days = cfg(state).residues.contaminantDays;
+        const cost = Math.round(range(state.rng.tech, cfg(state).residues.contaminantRepairEur[0], cfg(state).residues.contaminantRepairEur[1]));
         const cev = logEvent(log, day, {
           type: 'contaminants',
           severity: 'warning',
@@ -131,7 +132,7 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
   }
   state.residueTank = state.residueTank.filter((l) => l.tonnes > 0 || l.arrivalDay > day);
   if (fed.reststoff > 0) ch4PerT.reststoff = CONFIG.substrates.reststoff.ch4PerT * (qualitySum / fed.reststoff);
-  if (want.reststoff > 0 && fed.reststoff < want.reststoff - CONFIG.feeding.shortageToleranceT && state.lastFed.reststoff > fed.reststoff + CONFIG.feeding.shortageToleranceT) {
+  if (want.reststoff > 0 && fed.reststoff < want.reststoff - cfg(state).feeding.shortageToleranceT && state.lastFed.reststoff > fed.reststoff + cfg(state).feeding.shortageToleranceT) {
     // Reststoffe gehen aus: die Mischung ändert sich ohne Zutun
     const ev = logEvent(log, day, { type: 'residue_out', causes: [state.feedTargetEvent], data: { wantT: round(want.reststoff, 1) } });
     changeCause = changeCause ?? ev.id;

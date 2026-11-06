@@ -6,7 +6,9 @@ import { fieldsDay } from './fields';
 import { notifySupplyOffers, supplyDay } from './contracts';
 import { feedingDay } from './feeding';
 import { digestateDay, siloDay, siloStock } from './storage';
-import { chpCh4PerDay, techDay } from './tech';
+import { plantCh4PerDay, techDay } from './tech';
+import { cfg, hasChp, plantScale } from './plant';
+import { scaleMap } from './biology';
 import { acceptanceDay } from './acceptance';
 import { financeDay, settleMonth, villageHeatDemandKwh } from './finance';
 import { measurementDay } from './measurement';
@@ -32,17 +34,17 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
 
   // Ausbauten fertig
   for (const b of state.builds.filter((x) => x.doneDay === day)) {
-    const rest = b.costEur * (1 - CONFIG.builds.downPaymentShare);
+    const rest = b.costEur * (1 - cfg(state).builds.downPaymentShare);
     state.finance.balance -= rest;
     state.finance.ledger.ausbau = (state.finance.ledger.ausbau ?? 0) + rest;
     const ev = logEvent(state.log, day, { type: 'build_done', causes: [b.eventId], data: { kind: b.kind } });
     state.built[b.kind] = ev.id;
     switch (b.kind) {
-      case 'digestateStorage': state.digestate.capacityM3 += CONFIG.builds.digestateStorage.addM3; break;
-      case 'gasStorage': state.gas.capacityM3 += CONFIG.builds.gasStorage.addM3; break;
+      case 'digestateStorage': state.digestate.capacityM3 += cfg(state).builds.digestateStorage.addM3; break;
+      case 'gasStorage': state.gas.capacityM3 += cfg(state).builds.gasStorage.addM3; break;
       case 'cover': state.digestate.covered = true; break;
       case 'heatLine': state.heatLineActive = true; break;
-      case 'secondSilo': state.silo.capacityT += CONFIG.silo.secondSiloT; break;
+      case 'secondSilo': state.silo.capacityT += cfg(state).silo.secondSiloT; break;
     }
   }
   state.builds = state.builds.filter((x) => x.doneDay > day);
@@ -62,10 +64,13 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
   // Fütterung und Biologie
   const feed = feedingDay(state, playerChangedToday);
   state.fedToday = feed.fed;
+  // Die Biologie rechnet pro Referenzeinheit (Fermenter der Altanlage); größere Anlagen
+  // bestehen aus entsprechend vielen gleichartigen Einheiten
+  const k = plantScale(state);
   const bioOut = biologyDay(state, {
-    fed: feed.fed,
+    fed: scaleMap(feed.fed, 1 / k),
     ch4PerT: feed.ch4PerT,
-    heatShare: state.chp.runShare,
+    heatShare: state.heatShare,
     ambientC: weather.tempC,
     traceDosing: state.rampFeed !== null,
     shiftStressFactor: difficulty(state).shiftStressFactor,
@@ -75,17 +80,17 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
 
   // Gärrestlager (aufgefangenes Restgas geht in den Gasspeicher)
   const lostBefore = state.totals.ch4LostStorageM3;
-  const dg = digestateDay(state, bioOut.digestateT, bioOut.residualCh4, weather.tempC);
-  const ch4 = bioOut.ch4M3 + dg.capturedCh4;
+  const dg = digestateDay(state, bioOut.digestateT * k, bioOut.residualCh4 * k, weather.tempC);
+  const ch4 = bioOut.ch4M3 * k + dg.capturedCh4;
   state.totals.ch4ProducedM3 += ch4;
 
   // Gas und BHKW
-  const tech = techDay(state, ch4);
+  const tech = techDay(state, ch4, weather.tempC);
   state.today.spreadM3 = state.digestate.spreadToday - state.digestate.offtakeToday;
   state.today.offtakeM3 = state.digestate.offtakeToday;
 
   // Akzeptanz
-  const heatOutage = state.heatLineActive && state.chp.status !== 'betrieb' && villageHeatDemandKwh(state) / CONFIG.units.hoursPerDay > CONFIG.finance.heatOutageNoticeKw;
+  const heatOutage = state.heatLineActive && hasChp(state) && state.chp.status !== 'betrieb' && villageHeatDemandKwh(state) / CONFIG.units.hoursPerDay > cfg(state).finance.heatOutageNoticeKw;
   acceptanceDay(state, {
     trafficTrips: fr.trafficTrips + sr.trafficTrips + feed.trafficTrips,
     trafficSource: fr.trafficSource ?? sr.trafficSource ?? feed.trafficSource,
@@ -94,12 +99,12 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
   });
 
   // Finanzen
-  financeDay(state, { kwhEl: tech.kwhEl, kwhTh: tech.kwhTh, shortfallCause: shortfallCause(state, ch4) });
+  financeDay(state, { kwhEl: tech.kwhEl, kwhTh: tech.kwhTh, ch4Injected: tech.ch4Injected, upgradingKwh: tech.upgradingKwh, ch4Used: tech.ch4Used + tech.ch4Injected, shortfallCause: shortfallCause(state, ch4) });
 
   measurementDay(state);
   worldNotices(state);
   checkFailure(state);
-  recordHistory(state, tech.kwhEl, ch4);
+  recordHistory(state, tech.kwhEl, ch4, tech.ch4Injected * CONFIG.plant.methaneKwhPerM3);
 
   state.day++;
   if (!state.failure && state.day >= CONFIG.time.runDays) {
@@ -112,14 +117,15 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
 
 /** Welches Ereignis begrenzt heute die Erzeugung? */
 function shortfallCause(state: GameState, ch4: number): string | undefined {
-  if (state.chp.status !== 'betrieb') return state.chp.downEvent;
+  if (hasChp(state) && state.chp.status !== 'betrieb') return state.chp.downEvent;
+  if (state.upgrading && state.upgrading.status !== 'betrieb') return state.upgrading.downEvent;
   if (state.bio.tipped) return state.bio.tippedEvent;
   if (state.bio.fosLevel > 0) return state.bio.fosLevelEvent;
   const empty = state.silo.emptyEvent;
   if (empty?.mais) return empty.mais;
   if (empty?.gruenroggen) return empty.gruenroggen;
   if (state.contaminationUntilDay > state.day) return state.contaminationEvent;
-  if (ch4 < chpCh4PerDay()) return state.feedTargetEvent ?? state.origin.feeding;
+  if (ch4 < plantCh4PerDay(state)) return state.feedTargetEvent ?? state.origin.feeding;
   return undefined;
 }
 
@@ -128,10 +134,10 @@ function worldNotices(state: GameState): void {
   const daily = state.feedTarget.mais + state.feedTarget.gruenroggen;
   if (daily > 0) {
     const reach = siloStock(state) / daily;
-    if (reach < CONFIG.silo.lowStockNoticeDays && !state.silo.lowNoticeSent && siloStock(state) > 0) {
+    if (reach < cfg(state).silo.lowStockNoticeDays && !state.silo.lowNoticeSent && siloStock(state) > 0) {
       state.silo.lowNoticeSent = true;
       say(state, 'betriebsleiter', 'silo_knapp', { tage: Math.round(reach) });
-    } else if (reach > CONFIG.silo.lowStockNoticeDays * 2) {
+    } else if (reach > cfg(state).silo.lowStockNoticeDays * 2) {
       state.silo.lowNoticeSent = false;
     }
   }
@@ -152,7 +158,7 @@ function worldNotices(state: GameState): void {
   }
 }
 
-function recordHistory(state: GameState, kwhEl: number, ch4: number): void {
+function recordHistory(state: GameState, kwhEl: number, ch4: number, gasKwh: number): void {
   const h = state.history;
   h.day.push(state.day);
   h.gasM3.push(ch4 / state.bio.ch4Share);
@@ -166,6 +172,7 @@ function recordHistory(state: GameState, kwhEl: number, ch4: number): void {
   h.balance.push(state.finance.balance);
   h.acceptance.push(state.acceptance.value);
   h.powerKwh.push(kwhEl);
+  h.gasKwh.push(gasKwh);
   h.flaredM3.push(state.gas.flaredToday);
   h.chpWear.push(state.chp.wear);
 }

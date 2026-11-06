@@ -92,6 +92,12 @@ export const BACKGROUND: Record<string, string> = {
     'Reststoffe aus der Lebensmittelverarbeitung sind günstig und energiereich, aber nicht immer sauber. Verpackungsreste und Fremdkörper beschädigen Pumpen und Rührwerke.',
   grid_outage:
     'Bei Störungen im Stromnetz muss eine Anlage ihre Einspeisung unterbrechen. Ohne BHKW füllt sich der Gasspeicher, und der Fermenter bekommt keine Abwärme.',
+  upgrading_failure:
+    'Die Gasaufbereitung trennt Methan und Kohlendioxid über Membranen; Verdichter bringen das Gas auf Druck. Steht sie, kann kein Biomethan ins Netz. Das Gas sammelt sich im Speicher, und wenn er voll ist, brennt die Fackel. Schwefel im Gas und überfällige Wartung schädigen Verdichter und Membranen.',
+  upgrading_service_overdue:
+    'Verdichter haben feste Wartungsintervalle für Ventile, Dichtungen und Öl. Wird das Intervall überzogen, steigt das Risiko eines Ausfalls deutlich.',
+  gas_grid_stop:
+    'Das Erdgasnetz nimmt nur so viel Biomethan auf, wie Verbraucher abnehmen. In kleinen Netzen mit wenig Verbrauch, etwa im Sommer, oder bei Arbeiten am Netz muss die Einspeisung pausieren. Dann hilft nur ein großer Gasspeicher oder ein zweiter Verwerter wie ein BHKW.',
   stirrer_failure:
     'Rührwerke halten den Fermenterinhalt in Bewegung, damit Mikroorganismen und Futter in Kontakt kommen und keine Schwimmschichten entstehen. Fällt eines aus, kann weniger gefüttert werden.',
   residue_lot_started:

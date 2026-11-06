@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import { dayOfDate, inWindow, windowDays } from '../calendar';
 import type { Action, GameState } from '../types';
+import { cfg, plantScale } from '../plant';
 
 /**
  * Scripted Spielerprofile für Konsole, Tests und Balancing (Meilenstein 7).
@@ -32,8 +33,17 @@ interface Profile {
   reactToFos?: boolean;
 }
 
-function profileStrategy(p: Profile): Strategy {
+type FeedMap = Partial<Record<'mais' | 'gruenroggen' | 'guelle' | 'reststoff', number>>;
+/** Mengen der Profile gelten für die Altanlage und wachsen mit der Anlagengröße. */
+function scaled<T extends Record<string, number>>(m: T | undefined, k: number): T | undefined {
+  return m ? (Object.fromEntries(Object.entries(m).map(([key, v]) => [key, Math.round(v * k)])) as T) : undefined;
+}
+
+function profileStrategy(p0: Profile): Strategy {
   return (s) => {
+    const k = plantScale(s);
+    const p: Profile = k === 1 ? p0 : { ...p0, feed: scaled<FeedMap>(p0.feed, k), feedAfterRye: scaled<FeedMap>(p0.feedAfterRye, k), maizeContracts: scaled(p0.maizeContracts, k), ryeContracts: scaled(p0.ryeContracts, k) };
+    const blackoutGuelleT = strategyConfig.blackoutGuelleT * k;
     const a: Action[] = [];
     const d = s.day;
     if (d === 0) {
@@ -60,23 +70,26 @@ function profileStrategy(p: Profile): Strategy {
     if (p.maintain && s.chp.status === 'betrieb' && s.chp.hoursSinceService > CONFIG.chp.serviceIntervalH - CONFIG.chp.serviceNoticeHoursBefore) {
       a.push({ type: 'orderService', kind: 'klein' });
     }
+    if (p.maintain && s.upgrading && s.upgrading.status === 'betrieb' && s.upgrading.hoursSinceService > CONFIG.upgrading.serviceIntervalH - CONFIG.upgrading.serviceNoticeHoursBefore) {
+      a.push({ type: 'orderService', kind: 'aufbereitung' });
+    }
     if (p.desulf && s.desulf.mediumDays < CONFIG.desulfurization.lowNoticeDays) a.push({ type: 'orderService', kind: 'entschwefelung' });
     if (p.spread && !inWindow(d, CONFIG.digestate.blackout)) {
       const dg = s.digestate;
       const target = dg.capacityM3 * strategyConfig.spreadTargetShare;
       if (dg.spreadOrderM3 <= 0 && dg.m3 > target + strategyConfig.spreadMinOrderM3) a.push({ type: 'orderSpreading', m3: dg.m3 - target });
     }
-    if (p.spread && inWindow(d, CONFIG.digestate.blackout) && s.digestate.m3 / s.digestate.capacityM3 > strategyConfig.blackoutReduceShare && s.feedTarget.guelle > strategyConfig.blackoutGuelleT) {
-      a.push({ type: 'setFeeding', feed: { guelle: strategyConfig.blackoutGuelleT } });
+    if (p.spread && inWindow(d, CONFIG.digestate.blackout) && s.digestate.m3 / s.digestate.capacityM3 > strategyConfig.blackoutReduceShare && s.feedTarget.guelle > blackoutGuelleT) {
+      a.push({ type: 'setFeeding', feed: { guelle: blackoutGuelleT } });
     }
-    if (p.spread && !inWindow(d, CONFIG.digestate.blackout) && s.feedTarget.guelle === strategyConfig.blackoutGuelleT && (p.feed?.guelle ?? CONFIG.feeding.start.guelle) > strategyConfig.blackoutGuelleT) {
-      a.push({ type: 'setFeeding', feed: { guelle: p.feed?.guelle ?? CONFIG.feeding.start.guelle } });
+    if (p.spread && !inWindow(d, CONFIG.digestate.blackout) && s.feedTarget.guelle === blackoutGuelleT && (p.feed?.guelle ?? cfg(s).feeding.start.guelle) > blackoutGuelleT) {
+      a.push({ type: 'setFeeding', feed: { guelle: p.feed?.guelle ?? cfg(s).feeding.start.guelle } });
     }
     if (p.spotBelowDays) {
       const daily = s.feedTarget.mais;
       const pending = s.spotOrders.reduce((x, o) => x + o.tonnes, 0);
       const contractsLeft = s.contracts.filter((c) => c.kind === 'mais').reduce((x, c) => x + c.tonnes - c.delivered, 0);
-      if (daily > 0 && (s.silo.mais.t + pending + contractsLeft) / daily < p.spotBelowDays) a.push({ type: 'buySpot', tonnes: CONFIG.contracts.spot.maxTPerOrder });
+      if (daily > 0 && (s.silo.mais.t + pending + contractsLeft) / daily < p.spotBelowDays) a.push({ type: 'buySpot', tonnes: cfg(s).contracts.spot.maxTPerOrder });
     }
     if (p.reactToFos && s.measurement.fosTac > CONFIG.biology.fosTacWarning && s.feedChangedDay < d - strategyConfig.reactCooldownDays) {
       a.push({ type: 'setFeeding', feed: { mais: s.feedTarget.mais * strategyConfig.reactFactor, reststoff: 0 } });

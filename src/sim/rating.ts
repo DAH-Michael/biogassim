@@ -3,6 +3,7 @@ import { sumMap } from './biology';
 import { maizeShare } from './finance';
 import { siloStock } from './storage';
 import type { GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Jahresbilanz und Bewertung. Wird auch nach dem Scheitern berechnet
@@ -11,6 +12,8 @@ import type { GameState } from './types';
 export interface YearSummary {
   days: number;
   kwhEl: number;
+  /** eingespeistes Biomethan, kWh */
+  kwhGas: number;
   profitEur: number;
   balanceEur: number;
   acceptance: number;
@@ -27,12 +30,13 @@ export interface YearSummary {
 }
 
 export function yearSummary(state: GameState): YearSummary {
-  const R = CONFIG.rating;
+  const R = cfg(state).rating;
   const t = state.totals;
   const days = Math.max(1, state.history.day.length);
   const ch4Total = t.ch4ProducedM3 + t.ch4LostStorageM3;
   const flaredCh4 = t.flaredM3 * state.bio.ch4Share;
-  const gasLossShare = ch4Total > 0 ? (flaredCh4 + t.ch4LostStorageM3) / ch4Total : 0;
+  // Verluste: Fackel, offenes Gärrestlager und Methanschlupf der Aufbereitung
+  const gasLossShare = ch4Total > 0 ? (flaredCh4 + t.ch4LostStorageM3 + t.ch4SlipM3) / ch4Total : 0;
   const acc = state.history.acceptance;
   const acceptanceAvg = acc.length ? acc.reduce((a, b) => a + b, 0) / acc.length : state.acceptance.value;
   const dailySilage = state.feedTarget.mais + state.feedTarget.gruenroggen;
@@ -42,7 +46,7 @@ export function yearSummary(state: GameState): YearSummary {
   const supplyDays = dailySilage > 0 ? siloStock(state) / dailySilage : Infinity;
   // Investitionen sind kein Verlust: ihr Restwert nach einem Jahr zählt zum Ergebnis
   const invested = (state.finance.ledger.ausbau ?? 0) + (state.finance.ledger.ersatzBhkw ?? 0);
-  const profit = state.finance.balance - CONFIG.finance.startBalanceEur + invested * CONFIG.rating.investmentResidualShare;
+  const profit = state.finance.balance - cfg(state).finance.startBalanceEur + invested * cfg(state).rating.investmentResidualShare;
   const bioErrorShare = t.bioErrorDays / days;
 
   let points = 0;
@@ -69,6 +73,7 @@ export function yearSummary(state: GameState): YearSummary {
   return {
     days,
     kwhEl: t.kwhEl,
+    kwhGas: t.kwhGas,
     profitEur: profit,
     balanceEur: state.finance.balance,
     acceptance: state.acceptance.value,

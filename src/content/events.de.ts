@@ -25,7 +25,9 @@ export interface EventText { title: string; text: string }
 export function describeEvent(e: SimEvent): EventText {
   const d = e.data;
   switch (e.type) {
-    case 'origin_plant': return { title: 'Übernahme der Altanlage', text: `Das BHKW hat ${n(d.operatingHours)} Betriebsstunden und einen Verschleiß von ${pct(d.wear)}. Die letzte Wartung liegt ${n(d.hoursSinceService)} Stunden zurück.` };
+    case 'origin_plant':
+      if (d.plant === 'aufbereitung') return { title: 'Übernahme der Biomethananlage', text: 'Die Anlage bereitet ihr Biogas zu Biomethan auf und speist es ins Erdgasnetz ein. Ein BHKW gibt es nicht; den Fermenter heizt ein Gaskessel.' };
+      return { title: d.plant === 'verbund' ? 'Übernahme der Verbundanlage' : 'Übernahme der Altanlage', text: `Das BHKW hat ${n(d.operatingHours)} Betriebsstunden und einen Verschleiß von ${pct(d.wear)}. Die letzte Wartung liegt ${n(d.hoursSinceService)} Stunden zurück.${d.plant === 'verbund' ? ' Gas, das das BHKW nicht verwertet, geht in die Aufbereitung und als Biomethan ins Erdgasnetz.' : ''}` };
     case 'origin_storage': return { title: 'Gärrestlager der Altanlage', text: `Das Lager fasst ${n(d.capacityM3)} m³. Das reicht bei der übernommenen Fütterung für rund ${n(d.months, 1)} Monate. Die Auflage verlangt ${n(d.requiredMonths)} Monate.` };
     case 'origin_open_storage': return { title: 'Offenes Gärrestlager', text: 'Das Gärrestlager ist nicht abgedeckt. Regen läuft hinein, Restgas entweicht, Geruch dringt nach außen.' };
     case 'origin_silo': return { title: 'Silovorrat bei Übernahme', text: `Im Fahrsilo lagen ${n(d.maizeT)} t Maissilage, genug für etwa ${n(d.days)} Tage.` };
@@ -87,6 +89,11 @@ export function describeEvent(e: SimEvent): EventText {
     case 'stirrer_failure': return { title: 'Rührwerk gestört', text: `Ein Rührwerk ist ausgefallen. ${n(d.days)} Tage nur halbe Feststoffzufuhr, Reparatur ${n(d.costEur)} €.` };
     case 'chp_failure': return { title: 'BHKW-Störung', text: `Das BHKW steht ${n(d.days)} Tage, Reparatur ${n(d.costEur)} €. Verschleiß jetzt ${pct(d.wear)}.` };
     case 'chp_restart': return { title: 'BHKW läuft wieder', text: '' };
+    case 'upgrading_failure': return { title: 'Störung der Gasaufbereitung', text: `Die Aufbereitung steht ${n(d.days)} Tage, Reparatur ${n(d.costEur)} €. Das Gas sammelt sich im Speicher.` };
+    case 'upgrading_restart': return { title: 'Gasaufbereitung läuft wieder', text: '' };
+    case 'upgrading_service_overdue': return { title: 'Wartung der Aufbereitung überfällig', text: `Die Verdichter laufen ${n(d.hoursSinceService)} Stunden seit der letzten Wartung. Das Störungsrisiko steigt.` };
+    case 'service_upgrading': return { title: 'Gasaufbereitung gewartet', text: `Kosten ${n(d.costEur)} €, Stillstand ${n(d.days)} Tag(e).` };
+    case 'gas_grid_stop': return { title: 'Einspeisestopp', text: `Der Gasnetzbetreiber nimmt ${n(d.days)} Tage kein Biomethan ab.` };
     case 'chp_destroyed': return { title: 'BHKW-Totalschaden', text: `Der Motor ist irreparabel beschädigt (Verschleiß ${pct(d.wear)}). Ein Ersatz kostet ${n(d.costEur)} €.` };
     case 'chp_replaced': return { title: 'Ersatz-BHKW bestellt', text: `${n(d.costEur)} €, einige Wochen ohne Stromerzeugung.` };
     case 'flare_on': return { title: 'Notfackel brennt', text: `Der Gasspeicher ist voll, ${n(d.flaredM3)} m³ Biogas werden am ersten Tag verbrannt, ohne Strom zu erzeugen.` };
@@ -101,7 +108,7 @@ export function describeEvent(e: SimEvent): EventText {
     case 'acceptance_low': return { title: 'Akzeptanz sinkt', text: `Die Stimmung im Dorf ist gekippt (${n(d.acceptance)}).` };
     case 'acceptance_critical': return { title: 'Akzeptanz kritisch', text: `Die Akzeptanz liegt bei ${n(d.acceptance)}.` };
 
-    case 'maizecap_exceeded': return { title: 'Maisdeckel überschritten', text: `Der Maisanteil an der eingesetzten Masse liegt bei ${pct(d.share)}, erlaubt sind ${pct(d.cap)}. Für diesen Zeitraum zahlt der Netzbetreiber nur den Marktwert statt der EEG-Vergütung.` };
+    case 'maizecap_exceeded': return { title: 'Maisdeckel überschritten', text: `Der Maisanteil an der eingesetzten Masse liegt bei ${pct(d.share)}, erlaubt sind ${pct(d.cap)}. Für diesen Zeitraum gibt es für Strom nur den Marktwert statt der EEG-Vergütung und für Biomethan nur den Erdgaspreis.` };
     case 'credit_exceeded': return { title: 'Kreditrahmen überschritten', text: `Kontostand ${n(d.balance)} €, Rahmen ${n(d.limit)} €.` };
     case 'month_settled': return { title: 'Monatsabrechnung', text: `${n(d.kwh)} kWh zu ${n(d.price, 3)} €/kWh, Erlöse ${n(d.revenueEur)} €.` };
 

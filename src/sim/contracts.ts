@@ -7,39 +7,39 @@ import { say } from './messages';
 import { difficulty, hasFeature } from './difficulty';
 import { hasStaff, ledger, type SiloDelivery } from './storage';
 import type { GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Substratbeschaffung über Verträge und Märkte:
  * Mais- und Grünroggen-Lieferverträge, Nachkauf am Markt, Gülle, Reststoffe.
  */
 
-const K = CONFIG.contracts;
-const R = CONFIG.residues;
 
-export function supplyOffer(offerId: string) {
+export function supplyOffer(state: GameState, offerId: string) {
+  const K = cfg(state).contracts;
   return [...K.maizeOffers, ...K.ryeOffers].find((o) => o.id === offerId);
 }
 
-export function isMaizeOffer(offerId: string): boolean {
-  return K.maizeOffers.some((o) => o.id === offerId);
+export function isMaizeOffer(state: GameState, offerId: string): boolean {
+  return cfg(state).contracts.maizeOffers.some((o) => o.id === offerId);
 }
 
 /** Ist ein Angebot heute abschließbar? */
 export function offerOpen(state: GameState, offerId: string): boolean {
-  if (isMaizeOffer(offerId)) return state.day <= dayOfDate(K.maizeOfferDeadline);
-  return inWindow(state.day, K.ryeOfferWindow);
+  if (isMaizeOffer(state, offerId)) return state.day <= dayOfDate(cfg(state).contracts.maizeOfferDeadline);
+  return inWindow(state.day, cfg(state).contracts.ryeOfferWindow);
 }
 
 /** Preis inklusive Nachlass durch die Agrarberaterin. */
 export function offerPrice(state: GameState, base: number): number {
-  return hasStaff(state, 'agrar') ? base * (1 - K.advisorPriceDiscount) : base;
+  return hasStaff(state, 'agrar') ? base * (1 - cfg(state).contracts.advisorPriceDiscount) : base;
 }
 
 /** Aktueller Nachkaufpreis für Mais, €/t. */
 export function spotPrice(state: GameState): number {
-  let p: number = K.spot.basePriceEurPerT;
-  if (!inWindow(state.day, CONFIG.fields.windows.maisHarvest)) p *= K.spot.offSeasonFactor;
-  if (state.weather.drought) p *= K.spot.droughtFactor;
+  let p: number = cfg(state).contracts.spot.basePriceEurPerT;
+  if (!inWindow(state.day, CONFIG.fields.windows.maisHarvest)) p *= cfg(state).contracts.spot.offSeasonFactor;
+  if (state.weather.drought) p *= cfg(state).contracts.spot.droughtFactor;
   return p;
 }
 
@@ -55,11 +55,11 @@ export function supplyDay(state: GameState): SupplyDayResult {
     if (c.delivered >= c.tonnes || day < c.startDay || weather.wet) continue;
     const t = Math.min(c.deliveryTPerDay, c.tonnes - c.delivered);
     c.delivered += t;
-    res.deliveries.push({ kind: c.kind, t, quality: hasStaff(state, 'agrar') ? K.advisorContractQuality : CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm, origin: c.offerId });
-    const cost = t * (c.priceEurPerT + K.silageTransportEurPerTKm * c.distanceKm + K.silageHandlingEurPerT);
+    res.deliveries.push({ kind: c.kind, t, quality: hasStaff(state, 'agrar') ? cfg(state).contracts.advisorContractQuality : CONFIG.fields.contractQuality, source: c.eventId, throughVillage: c.throughVillage, distanceKm: c.distanceKm, origin: c.offerId });
+    const cost = t * (c.priceEurPerT + cfg(state).contracts.silageTransportEurPerTKm * c.distanceKm + cfg(state).contracts.silageHandlingEurPerT);
     state.finance.balance -= cost;
     ledger(state, 'substrat', t * c.priceEurPerT);
-    ledger(state, 'transport', t * (K.silageTransportEurPerTKm * c.distanceKm + K.silageHandlingEurPerT));
+    ledger(state, 'transport', t * (cfg(state).contracts.silageTransportEurPerTKm * c.distanceKm + cfg(state).contracts.silageHandlingEurPerT));
     state.harvestTotals[c.kind].contract += t;
     if (c.throughVillage) {
       res.trafficTrips += Math.ceil(t / CONFIG.fields.trailerT) * 2;
@@ -70,7 +70,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
   // Nachkauf
   for (const o of state.spotOrders) {
     if (o.arrivalDay !== day) continue;
-    res.deliveries.push({ kind: 'mais', t: o.tonnes, quality: CONFIG.fields.spotQuality, source: o.eventId, throughVillage: true, distanceKm: K.spot.distanceKm, origin: 'spot' });
+    res.deliveries.push({ kind: 'mais', t: o.tonnes, quality: CONFIG.fields.spotQuality, source: o.eventId, throughVillage: true, distanceKm: cfg(state).contracts.spot.distanceKm, origin: 'spot' });
     state.harvestTotals.mais.spot += o.tonnes;
     res.trafficTrips += Math.ceil(o.tonnes / CONFIG.fields.trailerT) * 2;
     res.trafficSource = res.trafficSource ?? o.eventId;
@@ -78,17 +78,17 @@ export function supplyDay(state: GameState): SupplyDayResult {
   state.spotOrders = state.spotOrders.filter((o) => o.arrivalDay > day);
 
   // Abschluss der Maisverträge
-  if (day === dayOfDate(K.maizeOfferDeadline)) {
+  if (day === dayOfDate(cfg(state).contracts.maizeOfferDeadline)) {
     const contracted = state.contracts.filter((c) => c.kind === 'mais').reduce((a, c) => a + c.tonnes, 0);
     const ev = logEvent(state.log, day, {
       type: 'maize_contracts_closed',
       playerDecision: true,
       causes: [],
-      data: { contractedT: Math.round(contracted), offeredT: K.maizeOffers.reduce((a, o) => a + o.maxT, 0) },
+      data: { contractedT: Math.round(contracted), offeredT: cfg(state).contracts.maizeOffers.reduce((a, o) => a + o.maxT, 0) },
     });
     state.supplyEvents.maizeContracts = ev.id;
   }
-  if (day === windowDays(K.ryeOfferWindow).end) {
+  if (day === windowDays(cfg(state).contracts.ryeOfferWindow).end) {
     const contracted = state.contracts.filter((c) => c.kind === 'gruenroggen').reduce((a, c) => a + c.tonnes, 0);
     const ev = logEvent(state.log, day, {
       type: 'rye_contracts_closed',
@@ -114,7 +114,7 @@ export function supplyDay(state: GameState): SupplyDayResult {
     });
     state.silo.harvestSummaryEvent = ev.id;
     // Verluste durch schlechte Verdichtung werden sichtbar
-    if (state.silo.mais.quality < CONFIG.silo.poorQualityEventThreshold) {
+    if (state.silo.mais.quality < cfg(state).silo.poorQualityEventThreshold) {
       const ev2 = logEvent(state.log, day, {
         type: 'silage_quality_poor',
         severity: 'warning',
@@ -142,28 +142,28 @@ export function supplyDay(state: GameState): SupplyDayResult {
   state.residueOffers = state.residueOffers.filter((o) => o.expiresDay >= day);
   if (day >= state.nextOfferDay && hasFeature(state, 'reststoffe')) {
     const r = state.rng.market;
-    const priceEurPerT = Math.round(range(r, R.priceEurPerT[0], R.priceEurPerT[1]));
+    const priceEurPerT = Math.round(range(r, cfg(state).residues.priceEurPerT[0], cfg(state).residues.priceEurPerT[1]));
     state.residueOffers.push({
       id: `r${day}`,
-      tonnes: Math.round(range(r, R.lotT[0], R.lotT[1])),
+      tonnes: Math.round(range(r, cfg(state).residues.lotT[0], cfg(state).residues.lotT[1])),
       priceEurPerT,
-      quality: lognormalMean1(r, R.qualitySigma * difficulty(state).residueSigmaFactor),
-      contaminated: chance(r, R.contaminantChance * difficulty(state).contaminantFactor),
-      expiresDay: day + R.offerValidDays,
+      quality: lognormalMean1(r, cfg(state).residues.qualitySigma * difficulty(state).residueSigmaFactor),
+      contaminated: chance(r, cfg(state).residues.contaminantChance * difficulty(state).contaminantFactor),
+      expiresDay: day + cfg(state).residues.offerValidDays,
     });
-    state.nextOfferDay = day + intRange(r, Math.ceil(R.offerIntervalDays * R.offerIntervalSpread[0]), Math.ceil(R.offerIntervalDays * R.offerIntervalSpread[1]));
+    state.nextOfferDay = day + intRange(r, Math.ceil(cfg(state).residues.offerIntervalDays * cfg(state).residues.offerIntervalSpread[0]), Math.ceil(cfg(state).residues.offerIntervalDays * cfg(state).residues.offerIntervalSpread[1]));
   }
   // Reststoffe kommen an
   for (const lot of state.residueTank) {
     if (lot.arrivalDay === day) {
-      res.trafficTrips += Math.ceil(lot.tonnes / K.guelleTruckT) * 2;
+      res.trafficTrips += Math.ceil(lot.tonnes / cfg(state).contracts.guelleTruckT) * 2;
       res.trafficSource = res.trafficSource ?? lot.eventId;
       state.residueDeliveredToday = lot.eventId;
     }
   }
 
   // Strommarktpreis
-  const F = CONFIG.finance;
+  const F = cfg(state).finance;
   const doyAngle = (2 * Math.PI * (state.day % CONFIG.units.daysPerYear)) / CONFIG.units.daysPerYear;
   const seasonal = F.marketEurPerKwh + F.marketSeasonalAmplitude * Math.cos(doyAngle);
   state.finance.marketPrice += (seasonal - state.finance.marketPrice) * F.marketReversion + F.marketNoise * (range(state.rng.market, -1, 1));
@@ -175,7 +175,7 @@ export function guelleAvailability(state: GameState): { supplierId: string; tPer
   return state.guelleContracts
     .filter((c) => c.activeFromDay <= state.day)
     .map((c) => {
-      const s = K.guelleSuppliers.find((x) => x.id === c.supplierId)!;
+      const s = cfg(state).contracts.guelleSuppliers.find((x) => x.id === c.supplierId)!;
       return { supplierId: s.id, tPerDay: s.maxTPerDay * state.scenarioFactors.guelleSupply, distanceKm: s.distanceKm, throughVillage: s.throughVillage, eventId: c.eventId };
     })
     .sort((a, b) => a.distanceKm - b.distanceKm);
@@ -190,11 +190,11 @@ export function takeGuelle(state: GameState, wantT: number): { t: number; traffi
     if (left <= 0) break;
     const t = Math.min(left, s.tPerDay);
     left -= t;
-    const cost = t * (K.guelleTransportEurPerTKm * s.distanceKm * state.scenarioFactors.guelleDistance + K.guelleHandlingEurPerT);
+    const cost = t * (cfg(state).contracts.guelleTransportEurPerTKm * s.distanceKm * state.scenarioFactors.guelleDistance + cfg(state).contracts.guelleHandlingEurPerT);
     state.finance.balance -= cost;
     ledger(state, 'transport', cost);
     if (s.throughVillage) {
-      trips += Math.ceil(t / K.guelleTruckT) * 2;
+      trips += Math.ceil(t / cfg(state).contracts.guelleTruckT) * 2;
       source = source ?? s.eventId;
     }
     if (t > 0) state.today.guelle.push({ origin: s.supplierId, t, distanceKm: s.distanceKm, throughVillage: s.throughVillage });
@@ -204,7 +204,7 @@ export function takeGuelle(state: GameState, wantT: number): { t: number; traffi
 
 export function notifySupplyOffers(state: GameState): void {
   if (state.day === 0) say(state, 'landwirt', 'mais_angebot', {});
-  if (state.day === windowDays(K.ryeOfferWindow).start) say(state, 'landwirt', 'roggen_angebot', {});
+  if (state.day === windowDays(cfg(state).contracts.ryeOfferWindow).start) say(state, 'landwirt', 'roggen_angebot', {});
   if (state.day === dayOfDate(CONFIG.messages.stubbleDigestate)) say(state, 'landwirt', 'gaerrest_stoppel', {});
-  if (state.day === dayOfDate(CONFIG.digestate.blackout.to) + 1) say(state, 'landwirt', 'gaerrest_fruehjahr', {});
+  if (state.day === dayOfDate(cfg(state).digestate.blackout.to) + 1) say(state, 'landwirt', 'gaerrest_fruehjahr', {});
 }

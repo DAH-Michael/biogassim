@@ -38,7 +38,7 @@ const OK: Status = { level: 'ok' };
 
 /** Tagesbedarf an Biogas für Volllast. */
 function fullLoadBiogas(s: GameState): number {
-  return biogasPerHourAtFullLoad(s.bio.ch4Share) * CONFIG.units.hoursPerDay;
+  return biogasPerHourAtFullLoad(s, s.bio.ch4Share) * CONFIG.units.hoursPerDay;
 }
 
 /** Reichweite des Silos in Tagen bei der eingestellten Fütterung, null ohne Silagefütterung. */
