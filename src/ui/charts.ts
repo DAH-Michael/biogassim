@@ -4,6 +4,7 @@ import { mainPath, type SimEvent } from '../sim/eventlog';
 import { describeEvent } from '../content/events.de';
 import type { GameState } from '../sim/types';
 import { fmt, h } from './dom';
+import { setShown } from './motion';
 import { cfg, hasChp } from '../sim/plant';
 
 /**
@@ -128,14 +129,14 @@ export function buildTimeline(s: GameState, opts: TimelineOptions = {}): HTMLEle
 
   const showTip = (x: number, y: number, title: string, body: string) => {
     tip.replaceChildren(h('strong', {}, title), h('span', {}, body));
-    tip.hidden = false;
+    setShown(tip, true);
     const r = wrap.getBoundingClientRect();
     const left = Math.min(Math.max(8, x - r.left + 12), r.width - 260);
     tip.style.left = `${left}px`;
     tip.style.top = `${y - r.top + 12}px`;
   };
   const hideTip = () => {
-    tip.hidden = true;
+    setShown(tip, false);
   };
   const setGuide = (day: number | null) => {
     for (const g of guides) {

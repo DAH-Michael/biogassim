@@ -17,6 +17,7 @@ import { buildStats } from './stats';
 import { hasChp, plantScale } from '../sim/plant';
 import logoUrl from '../assets/logos/dah-logo-horizontal-farbig.svg?url';
 import { TIPS } from '../content/tooltips.de';
+import { setShown } from './motion';
 
 /**
  * Oberfläche: Kopfzeile mit Kalender und Zeitsteuerung, Leiste mit Entscheidungsbereichen,
@@ -308,17 +309,24 @@ export class App {
   open(id: string): void {
     const p = PANELS.find((x) => x.id === id);
     if (!p || !this.panelAvailable(id)) return;
+    const switching = !this.drawer.hidden && this.openPanel !== null && this.openPanel.id !== id;
     this.openPanel = p;
-    this.drawer.hidden = false;
+    setShown(this.drawer, true);
     this.drawerTitle.textContent = p.title;
     this.rail.querySelectorAll('.rail__btn').forEach((b) => b.setAttribute('aria-expanded', String((b as HTMLElement).dataset.panel === id)));
     this.refreshPanel(true);
+    // Wechsel zwischen Bereichen: neuer Inhalt gleitet ein, statt hart zu springen
+    if (switching) {
+      this.drawerBody.classList.remove('is-swapping');
+      void this.drawerBody.offsetWidth;
+      this.drawerBody.classList.add('is-swapping');
+    }
   }
 
   close(): void {
     const id = this.openPanel?.id;
     this.openPanel = null;
-    this.drawer.hidden = true;
+    setShown(this.drawer, false);
     this.rail.querySelectorAll('.rail__btn').forEach((b) => b.setAttribute('aria-expanded', 'false'));
     if (id) (this.rail.querySelector(`[data-panel="${id}"]`) as HTMLElement | null)?.focus();
   }
@@ -495,7 +503,7 @@ export class App {
     this.close();
     const view = buildStats(this.game.state, { plantName: this.game.state.scenario.plantName ?? null, onClose: () => this.closeStats(), focus });
     this.statsOverlay.replaceChildren(h('div', { class: 'end__card' }, view));
-    this.statsOverlay.hidden = false;
+    setShown(this.statsOverlay, true);
     if (!focus) this.statsOverlay.scrollTop = 0;
     this.statsBtn.setAttribute('aria-pressed', 'true');
     // Leiste, Zeit und Kennwerte bleiben bedienbar; nur bei Tastaturbedienung den Fokus in die Ansicht holen
@@ -505,8 +513,8 @@ export class App {
 
   closeStats(resume = true): void {
     if (this.statsOverlay.hidden) return;
-    this.statsOverlay.hidden = true;
-    this.statsOverlay.replaceChildren();
+    // Inhalt bleibt bis zum nächsten Öffnen stehen, damit er sichtbar ausblenden kann
+    setShown(this.statsOverlay, false);
     this.statsFocus = undefined;
     this.metrics.setActive(null);
     this.statsBtn.setAttribute('aria-pressed', 'false');
@@ -518,7 +526,7 @@ export class App {
   showOverlay(content: HTMLElement): void {
     this.close();
     this.endOverlay.replaceChildren(h('div', { class: 'end__card' }, content));
-    this.endOverlay.hidden = false;
+    setShown(this.endOverlay, true);
     this.endOverlay.scrollTop = 0;
     // Leiste und Zeitsteuerung sind hinter Startmenü und Analyse nicht bedienbar
     this.setBackgroundInert(true);
@@ -527,7 +535,7 @@ export class App {
   }
 
   hideOverlay(): void {
-    this.endOverlay.hidden = true;
+    setShown(this.endOverlay, false);
     this.setBackgroundInert(false);
     this.updatePause();
   }

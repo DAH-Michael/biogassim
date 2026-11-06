@@ -1,4 +1,5 @@
 import { h } from './dom';
+import { setShown } from './motion';
 
 /**
  * Tooltips für alle Bedienelemente mit `data-tip`. Erscheinen bei Hover und Tastaturfokus,
@@ -90,7 +91,7 @@ export class Tooltips {
     if (!text || !t.isConnected) return;
     this.target = t;
     this.el.textContent = text;
-    this.el.hidden = false;
+    setShown(this.el, true);
     t.setAttribute('aria-describedby', 'tooltip');
     const r = t.getBoundingClientRect();
     const tip = this.el.getBoundingClientRect();
@@ -123,6 +124,6 @@ export class Tooltips {
     window.clearTimeout(this.timer);
     if (this.target) this.target.removeAttribute('aria-describedby');
     this.target = null;
-    this.el.hidden = true;
+    setShown(this.el, false);
   }
 }

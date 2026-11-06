@@ -2,6 +2,7 @@ import type { GameState } from '../sim/types';
 import { GENERAL_TIPS, GENERAL_TIP_EVERY_DAYS, HINTS, type Hint } from '../content/tutorial.de';
 import { advisorPortrait } from './portrait';
 import { h } from './dom';
+import { setShown } from './motion';
 
 /**
  * DAH-Beraterin im Tutorial-Modus. Zeigt einen Hinweis, sobald seine Lage eintritt,
@@ -76,13 +77,13 @@ export class Advisor {
       this.resumeSpeed = sp;
       this.hooks.setSpeed(0);
     }
-    this.el.hidden = false;
+    setShown(this.el, true);
   }
 
   private hide(resume: boolean): void {
     if (!this.active && this.el.hidden) return;
     this.active = false;
-    this.el.hidden = true;
+    setShown(this.el, false);
     if (resume && this.resumeSpeed !== null) this.hooks.setSpeed(this.resumeSpeed);
     this.resumeSpeed = null;
     this.lastHintDay = this.currentDay;
