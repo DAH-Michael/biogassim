@@ -3,7 +3,7 @@
  * Der aktuelle Zustand (z. B. „Silo reicht noch 12 Tage“) wird beim Anzeigen angehängt.
  */
 export const METRIC_TIPS: Record<string, string> = {
-  gas: 'Biogas, das die Fermenter heute erzeugt haben. Für Volllast braucht das BHKW je nach Methangehalt rund 5.700 m³ am Tag. Fällt die Menge, fehlt Strom und damit Erlös.',
+  gas: 'Biogas, das die Fermenter heute erzeugt haben. Fällt die Menge, fehlen Strom oder Biomethan und damit Erlös.',
   fos: 'Verhältnis von Säuren zu Puffer im Fermenter, gemessen im Labor. Unter 0,4 ist die Biologie entspannt, ab 0,5 droht sie zu kippen. Der Wert stammt aus der letzten Probe.',
   temp: 'Temperatur im Hauptfermenter. Die Biologie arbeitet zwischen 37 und 43 °C am besten. Reicht die Abwärme des BHKW nicht, kühlt der Fermenter langsam aus.',
   store: 'Füllstand des Gasspeichers auf dem Nachgärer. Fast voll heißt: bald brennt die Fackel. Fast leer heißt: das BHKW muss drosseln.',

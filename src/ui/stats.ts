@@ -4,6 +4,7 @@ import { yearSummary } from '../sim/rating';
 import type { GameState } from '../sim/types';
 import { buildTimeline } from './charts';
 import { fmt, h } from './dom';
+import { cfg, hasChp } from '../sim/plant';
 
 /**
  * Statistik während des Durchlaufs: Kennzahlen bis heute und die Verläufe seit dem 1. August.
@@ -20,10 +21,11 @@ export interface StatsOptions {
 export function buildStats(s: GameState, o: StatsOptions): HTMLElement {
   const y = yearSummary(s);
   const day = Math.max(0, Math.min(s.day - 1, CONFIG.time.runDays - 1));
-  const delta = s.finance.balance - CONFIG.finance.startBalanceEur;
+  const delta = s.finance.balance - cfg(s).finance.startBalanceEur;
   const rows: [string, string][] = [
     ['Tage gespielt', `${fmt.int(s.history.day.length)} von ${fmt.int(CONFIG.time.runDays)}`],
-    ['Strom erzeugt', `${fmt.int(y.kwhEl / 1000)} MWh`],
+    ...(hasChp(s) ? [['Strom erzeugt', `${fmt.int(y.kwhEl / 1000)} MWh`] as [string, string]] : []),
+    ...(s.upgrading ? [['Biomethan eingespeist', `${fmt.int(y.kwhGas / 1000)} MWh`] as [string, string]] : []),
     ['Kontostand seit Übernahme', `${delta >= 0 ? '+' : ''}${fmt.eur(delta)}`],
     ['Akzeptanz im Mittel', `${fmt.int(y.acceptanceAvg)} von 100`],
     ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} %`],

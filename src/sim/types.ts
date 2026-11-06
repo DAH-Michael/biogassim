@@ -159,6 +159,21 @@ export interface ChpState {
   destroyedEvent?: string;
 }
 
+/** Gasaufbereitung mit Einspeisung ins Erdgasnetz (nur Biomethan- und Verbundanlage) */
+export interface UpgradingState {
+  status: 'betrieb' | 'wartung' | 'stoerung' | 'einspeisestopp';
+  downUntilDay: number;
+  downEvent?: string;
+  operatingHours: number;
+  hoursSinceService: number;
+  serviceNoticeSent: boolean;
+  overdueEvent?: string;
+  /** Auslastung heute, Anteil der Kapazität */
+  runShare: number;
+  /** heute eingespeistes Methan, m³ */
+  injectedCh4Today: number;
+}
+
 export interface DesulfState {
   mediumDays: number;
   rawPpm: number;
@@ -251,6 +266,8 @@ export interface FinanceState {
   /** Monatsakkumulatoren */
   monthKwh: number;
   monthHeatKwh: number;
+  /** eingespeistes Biomethan im laufenden Monat, kWh */
+  monthGasKwh: number;
   monthMarketerEur: number;
   monthMarketValueSum: number;
   monthDays: number;
@@ -275,6 +292,8 @@ export interface History {
   balance: number[];
   acceptance: number[];
   powerKwh: number[];
+  /** eingespeistes Biomethan, kWh */
+  gasKwh: number[];
   flaredM3: number[];
   chpWear: number[];
 }
@@ -319,6 +338,12 @@ export interface GameState {
   bio: BiologyState;
   measurement: Measurement;
   chp: ChpState;
+  /** null, wenn die Anlage keine Gasaufbereitung hat */
+  upgrading: UpgradingState | null;
+  /** Wärmeversorgung des Fermenters gestern, Anteil des Bedarfs bei Volllast (BHKW plus Kessel) */
+  heatShare: number;
+  /** Gas, das der Heizkessel heute verbrannt hat, m³ Methan */
+  boilerCh4Today: number;
   desulf: DesulfState;
   gas: GasState;
   silo: SiloState;
@@ -369,6 +394,10 @@ export interface GameState {
     /** eingespeist nach Abzug des Eigenstroms */
     kwhSold: number;
     kwhHeatSold: number;
+    /** eingespeistes Biomethan, kWh */
+    kwhGas: number;
+    /** Methanschlupf der Aufbereitung, m³ */
+    ch4SlipM3: number;
     flaredM3: number;
     ch4LostStorageM3: number;
     ch4ProducedM3: number;
@@ -396,7 +425,7 @@ export type Action =
   | { type: 'leaseField'; fieldId: string }
   | { type: 'setCrop'; fieldId: string; crop: Crop }
   | { type: 'setHarvestDay'; fieldId: string; day: number }
-  | { type: 'orderService'; kind: 'klein' | 'gross' | 'entschwefelung' }
+  | { type: 'orderService'; kind: 'klein' | 'gross' | 'entschwefelung' | 'aufbereitung' }
   | { type: 'hire'; role: StaffMember['role'] }
   | { type: 'fire'; role: StaffMember['role'] }
   | { type: 'orderSpreading'; m3: number }

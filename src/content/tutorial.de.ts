@@ -4,6 +4,7 @@ import { maizeShare } from '../sim/finance';
 import { hasFeature } from '../sim/difficulty';
 import { siloStock } from '../sim/storage';
 import type { GameState } from '../sim/types';
+import { cfg, hasChp } from '../sim/plant';
 
 /**
  * Tutorial-Modus: Hinweise der DAH-Beraterin. Anders als der Rest des Spiels
@@ -22,6 +23,9 @@ export interface Hint {
 const n = (v: number) => Math.round(v).toLocaleString('de-DE');
 const fill = (s: GameState) => s.digestate.m3 / s.digestate.capacityM3;
 const blackout = (s: GameState) => inWindow(s.day, CONFIG.digestate.blackout);
+
+/** Technik, die der Verfahrenstechniker betreut, je nach Anlage */
+const techUnits = (s: GameState) => (hasChp(s) && s.upgrading ? 'BHKW und Gasaufbereitung' : s.upgrading ? 'die Gasaufbereitung' : 'das BHKW');
 
 export const HINTS: Hint[] = [
   {
@@ -45,13 +49,19 @@ export const HINTS: Hint[] = [
     id: 'personal',
     panel: 'staff',
     when: (s) => s.day >= 25 && hasFeature(s, 'personal') && s.staff.length === 0,
-    text: () => 'Fachleute kosten Geld, nehmen Ihnen aber Arbeit und Risiko ab. Der Verfahrenstechniker hält das BHKW in Schuss, die Biologin erkennt Probleme im Fermenter früher.',
+    text: (s) => `Fachleute kosten Geld, nehmen Ihnen aber Arbeit und Risiko ab. Der Verfahrenstechniker hält ${techUnits(s)} in Schuss, die Biologin erkennt Probleme im Fermenter früher.`,
   },
   {
     id: 'wartung',
     panel: 'tech',
-    when: (s) => s.chp.hoursSinceService >= CONFIG.chp.serviceIntervalH - CONFIG.chp.serviceNoticeHoursBefore && s.day >= 3,
+    when: (s) => hasChp(s) && s.chp.hoursSinceService >= CONFIG.chp.serviceIntervalH - CONFIG.chp.serviceNoticeHoursBefore && s.day >= 3,
     text: (s) => `Das BHKW läuft seit ${n(s.chp.hoursSinceService)} Stunden ohne Wartung. Alle ${n(CONFIG.chp.serviceIntervalH)} Stunden sind Öl, Zündkerzen und Filter dran. Aufschieben spart kurz Geld, aber der Motor verschleißt schneller und fällt öfter aus.`,
+  },
+  {
+    id: 'aufbereitung',
+    panel: 'tech',
+    when: (s) => !!s.upgrading && s.day >= 2,
+    text: () => 'Diese Anlage macht aus Biogas Biomethan: Membranen trennen Methan und Kohlendioxid, Verdichter drücken das Gas ins Erdgasnetz. Das kostet Strom, und ein kleiner Teil Methan entweicht. Steht die Aufbereitung, füllt sich der Gasspeicher, und irgendwann brennt die Fackel.',
   },
   {
     id: 'entschwefelung',
@@ -92,7 +102,7 @@ export const HINTS: Hint[] = [
   {
     id: 'roggen',
     panel: 'supply',
-    when: (s) => s.day >= dayOfDate(CONFIG.contracts.ryeOfferWindow.from) && !s.contracts.some((c) => c.kind === 'gruenroggen'),
+    when: (s) => s.day >= dayOfDate(cfg(s).contracts.ryeOfferWindow.from) && !s.contracts.some((c) => c.kind === 'gruenroggen'),
     text: () => 'Jetzt bieten Landwirte Grünroggen für die Ernte im Mai an. Er füllt das Silo, bevor der Mais im Herbst kommt, und zählt nicht zum Maisdeckel.',
   },
   {
@@ -110,13 +120,15 @@ export const HINTS: Hint[] = [
   {
     id: 'fackel',
     panel: 'feed',
-    when: (s) => s.gas.flaring && s.chp.status === 'betrieb',
-    text: () => 'Die Fackel brennt, obwohl das BHKW läuft: Es entsteht mehr Gas, als der Motor verwerten kann. Dieses Gas bringt kein Geld. Etwas weniger Futter spart Substrat, ohne Strom zu verlieren.',
+    when: (s) => s.gas.flaring && (!hasChp(s) || s.chp.status === 'betrieb') && (!s.upgrading || s.upgrading.status === 'betrieb'),
+    text: () => 'Die Fackel brennt, obwohl alles läuft: Es entsteht mehr Gas, als die Anlage verwerten kann. Dieses Gas bringt kein Geld. Etwas weniger Futter spart Substrat, ohne Erlös zu verlieren.',
   },
   {
     id: 'winter',
     when: (s) => s.day >= dayOfDate([12, 1]),
-    text: () => 'Im Winter braucht der Fermenter mehr Wärme. Die kommt aus der Abwärme des BHKW. Steht es länger, kühlt der Fermenter aus, und die Biologie wird langsamer.',
+    text: (s) => !s.upgrading
+      ? 'Im Winter braucht der Fermenter mehr Wärme. Die kommt aus der Abwärme des BHKW. Steht es länger, kühlt der Fermenter aus, und die Biologie wird langsamer.'
+      : `Im Winter braucht der Fermenter mehr Wärme. ${hasChp(s) ? 'Was die Abwärme des BHKW nicht deckt, liefert ein Gaskessel' : 'Die liefert ein Gaskessel'}, und der verbrennt eigenes Biogas. Im Winter geht deshalb mehr Gas in die Heizung und weniger ins Netz.`,
   },
   {
     id: 'fruehjahr',
@@ -127,7 +139,7 @@ export const HINTS: Hint[] = [
   {
     id: 'konto',
     panel: 'money',
-    when: (s) => s.finance.balance < -CONFIG.finance.creditLimitEur * 0.6,
+    when: (s) => s.finance.balance < -cfg(s).finance.creditLimitEur * 0.6,
     text: () => 'Ihr Konto ist tief im Minus. Im Herbst ist das normal, weil die Maisernte bezahlt wird und der Strom erst monatlich vergütet wird. Bleibt es länger über dem Kreditrahmen, kündigt die Bank.',
   },
 ];

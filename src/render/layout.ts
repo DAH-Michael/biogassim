@@ -27,6 +27,13 @@ export const PLANT = {
   flare: { x: 36.6, y: 27.6, h: 3.6 },
   pit: { cx: 28.3, cy: 21.6, r: 0.9 },
   gasStorage2: { cx: 35.6, cy: 27.6, r: 1.2 },
+  /** Erweiterung nach Norden für größere Anlagen: zweiter Fermenter, bei der Verbundanlage ein zweiter Nachgärer */
+  yard2: { x: 28.5, y: 7.5, w: 9, d: 6 },
+  fermenter2: { cx: 31.3, cy: 10.5, r: 2.6, h: 3.2 },
+  post2: { cx: 35.5, cy: 10.6, r: 1.8, h: 2.6 },
+  /** Gasaufbereitung (Container mit Membranmodulen) und Einspeisestation */
+  upgrading: { x: 34.7, y: 14.2, w: 2.6, d: 1.6, h: 1.5 },
+  injection: { x: 36.1, y: 16.4, w: 1.2, d: 1.0, h: 0.9 },
 };
 
 export const VILLAGE = {

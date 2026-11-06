@@ -23,6 +23,7 @@ export const TIPS = {
     money: 'Finanzen: Kontostand, Erlöse und Kosten seit dem 1. August. (K)',
   } as Record<string, string>,
 
+  serviceUpgrading: 'Wartet die Verdichter der Gasaufbereitung: Ventile, Dichtungen, Öl. Die Aufbereitung steht dafür einen Tag, das Gas geht so lange in den Speicher.',
   closePanel: 'Schließt diesen Bereich. (Esc)',
   stats: 'Statistik: Kennzahlen und Verlaufskurven aller Werte seit dem 1. August bis heute, mit Ihren Entscheidungen und Warnungen auf der Zeitachse. Das Spiel pausiert so lange. (S)',
   closeMessage: 'Blendet die Meldung aus. Sie hat keine weitere Wirkung.',

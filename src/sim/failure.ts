@@ -2,6 +2,7 @@ import { CONFIG } from './config';
 import { logEvent } from './eventlog';
 import { recentComplaints } from './acceptance';
 import type { FailureKind, GameState } from './types';
+import { cfg } from './plant';
 
 /**
  * Scheiterbedingungen. Jede erzeugt ein Ereignis der Stufe "failure", das über
@@ -21,7 +22,7 @@ export function checkFailure(state: GameState): void {
     return;
   }
   // Behördliche Stilllegung: Akzeptanz dauerhaft kritisch und wiederholte Beschwerden
-  const A = CONFIG.acceptance;
+  const A = cfg(state).acceptance;
   const complaints = recentComplaints(state);
   if (state.acceptance.daysCritical >= A.shutdownDays && complaints.length >= A.shutdownComplaints) {
     fail('behoerde', 'failure_acceptance', [state.acceptance.levelEvent, state.acceptance.authorityEvent, ...complaints.slice(-2)], {
@@ -42,7 +43,7 @@ export function checkFailure(state: GameState): void {
     return;
   }
   // Insolvenz
-  if (state.finance.daysOverLimit >= CONFIG.finance.insolvencyDays) {
+  if (state.finance.daysOverLimit >= cfg(state).finance.insolvencyDays) {
     fail('insolvenz', 'failure_insolvency', [state.finance.overLimitEvent], {
       balance: Math.round(state.finance.balance),
       days: state.finance.daysOverLimit,

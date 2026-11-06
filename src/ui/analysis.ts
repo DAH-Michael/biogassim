@@ -6,6 +6,8 @@ import { describeEvent, FAILURE_TITLES } from '../content/events.de';
 import { BACKGROUND, eventIcon, outcomeSentence, tierName } from '../content/analysis.de';
 import type { GameState } from '../sim/types';
 import { buildTimeline } from './charts';
+import { hasChp } from '../sim/plant';
+import { REAL_WORLD_INTRO, realWorldItems } from '../content/realworld.de';
 import { fmt, h } from './dom';
 import { TIPS } from '../content/tooltips.de';
 
@@ -44,13 +46,14 @@ export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement 
   parts.push(summaryBlock(s, failed));
   if (failed) parts.push(chainBlock(s));
   else parts.push(eventsBlock(s));
+  if (!failed) parts.push(realWorldBlock(s));
   parts.push(h('details', { class: 'level' }, h('summary', {}, h('span', { class: 'level__title' }, 'Verläufe über das Jahr')), buildTimeline(s)));
   return h('div', { class: 'analysis' }, ...parts);
 }
 
 // ---------- Ergebnis zum Vergleichen ----------
 
-const SCENARIO_NAMES: Record<string, string> = { altanlage: 'Altanlage', eigene_felder: 'Mit eigenen Feldern', schwieriger_standort: 'Schwieriger Standort' };
+const SCENARIO_NAMES: Record<string, string> = { altanlage: 'Altanlage', eigene_felder: 'Biomethananlage', schwieriger_standort: 'Verbundanlage' };
 
 /**
  * Ergebnis des Durchlaufs, gut lesbar für einen Screenshot oder den Vergleich mit Kollegen.
@@ -85,10 +88,11 @@ function scoreCard(s: GameState, best: number | null): HTMLElement {
 function summaryBlock(s: GameState, failed: boolean): HTMLElement {
   const y = yearSummary(s);
   const rows: [string, string][] = [
-    ['Strom erzeugt', `${fmt.int(y.kwhEl / 1000)} MWh`],
+    ...(hasChp(s) ? [['Strom erzeugt', `${fmt.int(y.kwhEl / 1000)} MWh`] as [string, string]] : []),
+    ...(s.upgrading ? [['Biomethan eingespeist', `${fmt.int(y.kwhGas / 1000)} MWh`] as [string, string]] : []),
     ['Gewinn', fmt.eur(y.profitEur)],
     ['Akzeptanz im Mittel', `${fmt.int(y.acceptanceAvg)} von 100`],
-    ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} % (Fackel ${fmt.int(y.flaredM3)} m³ Biogas, Lager ${fmt.int(y.ch4LostStorageM3)} m³ Methan)`],
+    ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} % (Fackel ${fmt.int(y.flaredM3)} m³ Biogas, Lager ${fmt.int(y.ch4LostStorageM3)} m³ Methan${s.upgrading ? `, Schlupf der Aufbereitung ${fmt.int(s.totals.ch4SlipM3)} m³ Methan` : ''})`],
     ['Maisanteil an der Masse', fmt.pct(y.maizeShare)],
     ['Tage mit gestörter Biologie', fmt.pct(y.bioErrorShare)],
   ];
@@ -171,6 +175,17 @@ function eventsBlock(s: GameState): HTMLElement {
   return h('details', { class: 'level' },
     h('summary', {}, h('span', { class: 'level__title' }, `Schwierige Momente des Jahres (${important.length})`)),
     items.length ? h('ol', { class: 'chain chain--plain' }, ...items) : h('p', {}, 'Keine Warnungen im ganzen Jahr.'),
+  );
+}
+
+// ---------- Was im echten Betrieb noch dazugehört ----------
+
+function realWorldBlock(s: GameState): HTMLElement {
+  const items = realWorldItems(s, hasChp(s));
+  return h('details', { class: 'level', open: true },
+    h('summary', {}, h('span', { class: 'level__title' }, 'Was im echten Betrieb noch dazugehört')),
+    h('p', { class: 'muted' }, REAL_WORLD_INTRO),
+    h('ul', { class: 'realworld' }, ...items.map((i) => h('li', { class: 'realworld__item' }, h('strong', {}, i.title), h('span', {}, i.text)))),
   );
 }
 

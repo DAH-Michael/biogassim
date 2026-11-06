@@ -488,3 +488,12 @@ input.code__input { width: 9.5em; }
 .level-preview__off, .level-preview__limited { display: inline-block; margin-right: 2px; padding: 0 var(--space-2); border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; }
 .level-preview__off { background: repeating-linear-gradient(135deg, var(--k10) 0 6px, var(--k20) 6px 12px); color: var(--ink); }
 .level-preview__limited { background: var(--warning-soft); color: var(--warning-ink); border: 1px solid var(--warning); }
+
+/* Kennwert, dessen Verlauf gerade in der Statistik offen ist */
+.metric[aria-pressed='true'] { box-shadow: 0 0 0 3px var(--hellgruen-50); }
+.stats-btn[aria-pressed='true'] { background: var(--dunkelgruen); border-color: var(--dunkelgruen); color: var(--cream); }
+
+/* Was im echten Betrieb noch dazugehört */
+.realworld { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); }
+.realworld__item { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--line); border-left: 4px solid var(--hellgruen); border-radius: var(--radius-xs); background: var(--bg-muted); font-size: 14px; line-height: 1.5; }
+.realworld__item strong { font-family: var(--font-display); font-size: 17px; color: var(--dunkelgruen); }

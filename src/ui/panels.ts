@@ -3,7 +3,7 @@ import { dateOfDay, dayOfDate, formatDate, inWindow, windowDays } from '../sim/c
 import { guelleAvailability, offerOpen, offerPrice, spotPrice } from '../sim/contracts';
 import { defaultHarvestDay, fieldConfig, harvestWindowFor } from '../sim/fields';
 import { maizeShare } from '../sim/finance';
-import { organicLoadingRate, sumMap } from '../sim/biology';
+import { organicLoadingRate, scaleMap, sumMap } from '../sim/biology';
 import { hasStaff } from '../sim/storage';
 import type { Action, Crop, GameState } from '../sim/types';
 import type { ActionResult } from '../sim/actions';
@@ -11,6 +11,8 @@ import { fmt, h, svg } from './dom';
 import { TIPS } from '../content/tooltips.de';
 import { buildAvailable, hasFeature, roleAvailable, type DifficultyId } from '../sim/difficulty';
 import { ICONS, type IconName } from './icons';
+import { cfg, hasChp, plantScale, plantSpec } from '../sim/plant';
+import { maintenanceContractFee } from '../sim/finance';
 
 /**
  * Entscheidungsbereiche. Beschriftet, aber ohne Erklärungen. Jede Änderung wirkt sofort
@@ -90,7 +92,7 @@ function feedPanel(ctx: PanelCtx): HTMLElement {
     const id = `feed-${sub}`;
     const out = h('output', { for: id, class: 'slider__value' }, `${fmt.dec(target[sub], 1)} t`);
     const input = h('input', {
-      type: 'range', id, 'data-tip': TIPS.feedSlider, min: 0, max: CONFIG.feeding.maxPerSubstrate[sub], step: 0.5, value: target[sub], class: 'slider__input', 'data-focus': id,
+      type: 'range', id, 'data-tip': TIPS.feedSlider, min: 0, max: cfg(s).feeding.maxPerSubstrate[sub], step: 0.5, value: target[sub], class: 'slider__input', 'data-focus': id,
       'aria-valuetext': `${fmt.dec(target[sub], 1)} Tonnen pro Tag`,
     }) as HTMLInputElement;
     input.addEventListener('input', () => {
@@ -107,7 +109,7 @@ function feedPanel(ctx: PanelCtx): HTMLElement {
     section('Tägliche Fütterung', ...rows),
     section('Kennwerte',
       kv('Tagesmenge', `${fmt.dec(sumMap(target), 1)} t`),
-      kv('Raumbelastung', `${fmt.dec(organicLoadingRate(target), 2)} kg oTS/(m³·d)`),
+      kv('Raumbelastung', `${fmt.dec(organicLoadingRate(scaleMap(target, 1 / plantScale(s))), 2)} kg oTS/(m³·d)`),
       kv('Maisanteil seit 1. August', fmt.pct(maizeShare(s))),
       kv('Heute gefüttert', `${fmt.dec(sumMap(s.fedToday), 1)} t`),
     ),
@@ -138,10 +140,10 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
       );
     }).filter(Boolean) as HTMLElement[];
 
-  const maize = offers(CONFIG.contracts.maizeOffers);
-  const rye = offers(CONFIG.contracts.ryeOffers);
-  const ryeWin = windowDays(CONFIG.contracts.ryeOfferWindow);
-  const guelle = CONFIG.contracts.guelleSuppliers.map((g) => {
+  const maize = offers(cfg(s).contracts.maizeOffers);
+  const rye = offers(cfg(s).contracts.ryeOffers);
+  const ryeWin = windowDays(cfg(s).contracts.ryeOfferWindow);
+  const guelle = cfg(s).contracts.guelleSuppliers.map((g) => {
     const c = s.guelleContracts.find((x) => x.supplierId === g.id);
     const status = c ? (c.activeFromDay <= s.day ? 'Vertrag läuft' : `Lieferung ab ${formatDate(c.activeFromDay)}`) : 'kein Vertrag';
     return row(
@@ -168,7 +170,7 @@ function supplyPanel(ctx: PanelCtx): HTMLElement {
       kv('Preis heute', `${fmt.dec(spotPrice(s), 2)} €/t`),
       row(...[100, 300].map((t) => button(`${t} t kaufen`, () => report('supply', ctx.act({ type: 'buySpot', tonnes: t })), { key: `spot-${t}`, tip: TIPS.buySpot }))),
     ),
-    !hasFeature(s, 'reststoffe') ? null : section('Reststoffe', kv('Vorlagebehälter', `${fmt.int(tank)} von ${fmt.int(CONFIG.plant.residueTankT)} t`), ...(residues.length ? residues : [h('p', { class: 'muted' }, 'Gerade kein Angebot.')])),
+    !hasFeature(s, 'reststoffe') ? null : section('Reststoffe', kv('Vorlagebehälter', `${fmt.int(tank)} von ${fmt.int(cfg(s).plant.residueTankT)} t`), ...(residues.length ? residues : [h('p', { class: 'muted' }, 'Gerade kein Angebot.')])),
     statusLine('supply'),
   );
 }
@@ -221,8 +223,25 @@ function techPanel(ctx: PanelCtx): HTMLElement {
   const C = CONFIG.chp;
   const status = chp.status === 'betrieb' ? 'in Betrieb' : chp.status === 'wartung' ? `Wartung bis ${formatDate(chp.downUntilDay)}` : chp.status === 'stoerung' ? `Störung bis ${formatDate(chp.downUntilDay)}` : Number.isFinite(chp.downUntilDay) ? `Austausch bis ${formatDate(chp.downUntilDay)}` : 'ausgefallen';
   const tech = hasStaff(s, 'techniker');
+  const upg = s.upgrading;
+  const U = CONFIG.upgrading;
+  const upgStatus = !upg ? '' : upg.status === 'betrieb' ? 'in Betrieb' : upg.status === 'wartung' ? `Wartung bis ${formatDate(upg.downUntilDay)}` : upg.status === 'stoerung' ? `Störung bis ${formatDate(upg.downUntilDay)}` : `Einspeisestopp bis ${formatDate(upg.downUntilDay)}`;
+  const upgSection = !upg ? null : section('Gasaufbereitung',
+    kv('Zustand', upgStatus),
+    kv('Kapazität', `${fmt.int(plantSpec(s).upgradingRawM3PerH)} m³ Rohbiogas pro Stunde`),
+    kv('Auslastung heute', fmt.pct(upg.runShare)),
+    kv('Biomethan heute', `${fmt.int(upg.injectedCh4Today * CONFIG.plant.methaneKwhPerM3)} kWh`),
+    kv('Stunden seit Wartung', `${fmt.int(upg.hoursSinceService)} h`),
+    kv('Wartungsintervall', `${fmt.int(U.serviceIntervalH)} h`),
+    button(`Verdichter warten, ${fmt.eur(s.maintenanceContract ? 0 : U.serviceCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'aufbereitung' })), { key: 'svc-upg', tip: TIPS.serviceUpgrading }),
+    h('p', { class: 'muted' }, `Vergütung ${fmt.dec(U.biomethaneEurPerKwh * 100, 1)} ct pro kWh Biomethan. Strombedarf ${fmt.dec(U.powerKwhPerRawM3, 2)} kWh je m³ Rohbiogas, Methanschlupf ${fmt.dec(U.methaneSlip * 100, 1)} %.`),
+  );
+  const boilerSection = !plantSpec(s).boiler ? null : section('Heizkessel',
+    kv('Gas für die Fermenterheizung heute', `${fmt.int(s.boilerCh4Today)} m³ Methan`),
+    h('p', { class: 'muted' }, hasChp(s) ? 'Springt ein, wenn die Abwärme des BHKW für den Fermenter nicht reicht.' : 'Heizt den Fermenter mit eigenem Biogas, weil es kein BHKW gibt.'),
+  );
   return h('div', {},
-    section('BHKW',
+    !hasChp(s) ? null : section('BHKW',
       kv('Zustand', status),
       kv('Stunden seit Wartung', `${fmt.int(chp.hoursSinceService)} h`),
       kv('Wartungsintervall', `${fmt.int(C.serviceIntervalH)} h`),
@@ -233,13 +252,15 @@ function techPanel(ctx: PanelCtx): HTMLElement {
       ),
       !hasFeature(s, 'instandsetzung') ? null : h('p', { class: 'muted' }, `Stillstand: ${tech ? 1 : C.smallService.downtimeDays} bzw. ${tech ? Math.max(1, Math.round(C.majorService.downtimeDays * CONFIG.staff.technicianDowntimeFactor)) : C.majorService.downtimeDays} Tage`),
     ),
+    upgSection,
+    boilerSection,
     !hasFeature(s, 'entschwefelung') ? null : section('Entschwefelung',
       kv('Vorrat Verbrauchsmittel', `etwa ${fmt.int(s.desulf.mediumDays)} Tage`),
       kv('H₂S im Gas', `${fmt.int(s.desulf.cleanPpm)} ppm`),
-      button(`Nachfüllen, ${fmt.eur(CONFIG.desulfurization.refillCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'entschwefelung' })), { key: 'svc-desulf', tip: TIPS.desulf }),
+      button(`Nachfüllen, ${fmt.eur(cfg(s).desulfurization.refillCostEur)}`, () => report('tech', ctx.act({ type: 'orderService', kind: 'entschwefelung' })), { key: 'svc-desulf', tip: TIPS.desulf }),
     ),
     s.unlocks.includes('wartungsvertrag')
-      ? section('Wartungsvertrag', s.maintenanceContract ? h('p', {}, 'Vertrag läuft.') : button(`Abschließen, ${fmt.eur(CONFIG.maintenanceContract.eurPerMonth)} im Monat`, () => report('tech', ctx.act({ type: 'signMaintenanceContract' })), { key: 'mc', tip: TIPS.maintenanceContract }))
+      ? section('Wartungsvertrag', s.maintenanceContract ? h('p', {}, 'Vertrag läuft.') : button(`Abschließen, ${fmt.eur(maintenanceContractFee(s))} im Monat`, () => report('tech', ctx.act({ type: 'signMaintenanceContract' })), { key: 'mc', tip: TIPS.maintenanceContract }))
       : null,
     statusLine('tech'),
   );
@@ -297,20 +318,32 @@ function digestatePanel(ctx: PanelCtx): HTMLElement {
 
 // ---------- Ausbau und Dorf ----------
 
+/** Tooltip eines Ausbaus mit den Mengen dieser Anlagengröße. */
+function buildTip(s: GameState, k: BuildKind): string {
+  const c = cfg(s);
+  const n = (v: number) => fmt.int(v);
+  switch (k) {
+    case 'digestateStorage': return `Baut ein zweites Gärrestlager mit ${n(c.builds.digestateStorage.addM3)} m³. Mehr Platz über die Sperrfrist.`;
+    case 'gasStorage': return `Vergrößert den Gasspeicher um ${n(c.builds.gasStorage.addM3)} m³. Mehr Puffer bei Stillständen, weniger Fackel.`;
+    case 'secondSilo': return `Baut ein zweites Fahrsilo für ${n(c.silo.secondSiloT)} t Silage.`;
+    default: return TIPS.build[k];
+  }
+}
+
 function buildPanel(ctx: PanelCtx): HTMLElement {
   const s = ctx.state;
   const kinds = (Object.keys(BUILD_NAMES) as BuildKind[]).filter((k) => buildAvailable(s, k));
   const rows = kinds.map((k) => {
-    const cfg = CONFIG.builds[k];
-    const cost = k === 'cover' && s.unlocks.includes('abdeckung_guenstig') ? CONFIG.builds.cover.costEurUnlocked : cfg.costEur;
+    const spec = cfg(s).builds[k];
+    const cost = k === 'cover' && s.unlocks.includes('abdeckung_guenstig') ? cfg(s).builds.cover.costEurUnlocked : spec.costEur;
     const order = s.builds.find((b) => b.kind === k);
     const done = s.built[k] || (k === 'heatLine' && s.heatLineActive);
     const state = done ? 'fertig' : order ? `im Bau bis ${formatDate(order.doneDay)}` : null;
     return h('div', { class: 'card' },
       h('h4', {}, BUILD_NAMES[k]),
       kv('Kosten', fmt.eur(cost)),
-      kv('Bauzeit', `${cfg.days} Tage`),
-      state ? kv('Stand', state) : button('Beauftragen', () => report('build', ctx.act({ type: 'build', kind: k })), { key: `build-${k}`, tip: `${TIPS.build[k]} ${TIPS.buildCost}` }),
+      kv('Bauzeit', `${spec.days} Tage`),
+      state ? kv('Stand', state) : button('Beauftragen', () => report('build', ctx.act({ type: 'build', kind: k })), { key: `build-${k}`, tip: `${buildTip(s, k)} ${TIPS.buildCost}` }),
     );
   });
   const dialog = s.unlocks.includes('buergerdialog')
@@ -329,22 +362,24 @@ const LEDGER_NAMES: Record<string, string> = {
   erloesStrom: 'Strom', erloesWaerme: 'Wärme', erloesVermarktung: 'Vermarktung', silageSold: 'Silage abgegeben',
   substrat: 'Substrat', transport: 'Transport', gaerrest: 'Gärrest', personal: 'Personal', fixkosten: 'Betrieb und Versicherung',
   wartung: 'Wartung', reparatur: 'Reparaturen', ausbau: 'Ausbau', pacht: 'Pacht', anbau: 'Anbau', labor: 'Labor', betrieb: 'Sonstiges',
-  zinsen: 'Zinsen', netzstrom: 'Netzstrom (Eigenbedarf)', ersatzBhkw: 'Ersatz-BHKW',
+  zinsen: 'Zinsen', erloesBiomethan: 'Biomethan', netzstrom: 'Netzstrom (Eigenbedarf)', ersatzBhkw: 'Ersatz-BHKW',
 };
-const INCOME = new Set(['erloesStrom', 'erloesWaerme', 'erloesVermarktung', 'silageSold']);
+const INCOME = new Set(['erloesBiomethan', 'erloesStrom', 'erloesWaerme', 'erloesVermarktung', 'silageSold']);
 
 function financePanel(ctx: PanelCtx): HTMLElement {
   const s = ctx.state;
   const L = s.finance.ledger;
   const income = Object.entries(L).filter(([k]) => INCOME.has(k));
   const costs = Object.entries(L).filter(([k]) => !INCOME.has(k) && LEDGER_NAMES[k]).sort((a, b) => b[1] - a[1]);
-  const kwh = s.totals.kwhSold;
+  // Bezug: verkaufte Energie (Strom und Biomethan)
+  const kwh = s.totals.kwhSold + s.totals.kwhGas;
   const totalCost = costs.reduce((a, [, v]) => a + v, 0);
   return h('div', {},
     section('Konto',
       kv('Kontostand', fmt.eur(s.finance.balance)),
-      kv('Kreditrahmen', fmt.eur(CONFIG.finance.creditLimitEur)),
-      kv('Strom diesen Monat', `${fmt.int(s.finance.monthKwh)} kWh`),
+      kv('Kreditrahmen', fmt.eur(cfg(s).finance.creditLimitEur)),
+      hasChp(s) ? kv('Strom diesen Monat', `${fmt.int(s.finance.monthKwh)} kWh`) : null,
+      s.upgrading ? kv('Biomethan diesen Monat', `${fmt.int(s.finance.monthGasKwh)} kWh`) : null,
       kv('Abrechnung', 'am Monatsersten'),
     ),
     section('Erlöse seit 1. August', ...income.map(([k, v]) => kv(LEDGER_NAMES[k], fmt.eur(v)))),
@@ -353,7 +388,8 @@ function financePanel(ctx: PanelCtx): HTMLElement {
       ? section('Kosten pro Kilowattstunde',
         ...costs.map(([k, v]) => kv(LEDGER_NAMES[k], `${fmt.dec((v / kwh) * 100, 2)} ct`)),
         kv('Zusammen', `${fmt.dec((totalCost / kwh) * 100, 2)} ct`),
-        kv('Vergütung', `${fmt.dec(CONFIG.finance.eegEurPerKwh * 100, 2)} ct`))
+        hasChp(s) ? kv('Vergütung Strom', `${fmt.dec(cfg(s).finance.eegEurPerKwh * 100, 2)} ct`) : null,
+        s.upgrading ? kv('Vergütung Biomethan', `${fmt.dec(CONFIG.upgrading.biomethaneEurPerKwh * 100, 2)} ct`) : null)
       : null,
   );
 }

@@ -7,6 +7,7 @@ import type { GameState } from '../sim/types';
 import { METRIC_LEVEL_LABEL, METRIC_OPEN_HINT, METRIC_TIPS } from '../content/metrics.de';
 import { fmt, h, svg } from './dom';
 import { ICONS } from './icons';
+import { cfg } from '../sim/plant';
 
 /**
  * Kennwertleiste: je Kennwert eine Karte mit eigenem Symbol, Wert und Trendpfeil.
@@ -38,7 +39,7 @@ const OK: Status = { level: 'ok' };
 
 /** Tagesbedarf an Biogas für Volllast. */
 function fullLoadBiogas(s: GameState): number {
-  return biogasPerHourAtFullLoad(s.bio.ch4Share) * CONFIG.units.hoursPerDay;
+  return biogasPerHourAtFullLoad(s, s.bio.ch4Share) * CONFIG.units.hoursPerDay;
 }
 
 /** Reichweite des Silos in Tagen bei der eingestellten Fütterung, null ohne Silagefütterung. */
@@ -55,7 +56,7 @@ export const METRICS: Metric[] = [
     value: (s) => `${fmt.int(s.gas.producedToday)} m³/Tag`, series: (s, i) => s.history.gasM3[i],
     status: (s) => {
       const share = s.gas.producedToday / fullLoadBiogas(s);
-      const reason = `Heute ${fmt.pct(share)} des Bedarfs für Volllast.`;
+      const reason = `Heute ${fmt.pct(share)} der Auslegungsmenge von rund ${fmt.int(fullLoadBiogas(s))} m³ am Tag.`;
       if (share < MW.gasShareCrit) return { level: 'crit', reason };
       if (share < MW.gasShareWarn) return { level: 'warn', reason };
       return { level: 'ok', reason };
@@ -124,7 +125,7 @@ export const METRICS: Metric[] = [
     value: (s) => fmt.eur(s.finance.balance), series: (s, i) => s.history.balance[i],
     status: (s) => {
       const b = s.finance.balance;
-      const F = CONFIG.finance;
+      const F = cfg(s).finance;
       if (b < -F.creditLimitEur * F.bankNoticeShare) return { level: 'crit', reason: `Der Kreditrahmen von ${fmt.eur(F.creditLimitEur)} ist fast ausgeschöpft.` };
       if (b < MW.balanceWarnEur) return { level: 'warn', reason: 'Das Konto ist im Minus, es fallen Zinsen an.' };
       return OK;
@@ -203,6 +204,11 @@ export class MetricsBar {
       const status = st.level === 'ok' ? st.reason : `${METRIC_LEVEL_LABEL[st.level]}: ${st.reason}`;
       c.root.dataset.tip = [METRIC_TIPS[m.id], status, METRIC_OPEN_HINT].filter(Boolean).join('\n\n');
     }
+  }
+
+  /** Kennwert hervorheben, dessen Verlauf gerade in der Statistik gezeigt wird */
+  setActive(id: string | null): void {
+    for (const [k, c] of this.cells) c.root.setAttribute('aria-pressed', String(k === id));
   }
 
   /** aktuelle Warnstufe eines Kennwerts (für Tests und Beraterin) */
