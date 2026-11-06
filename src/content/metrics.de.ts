@@ -15,4 +15,4 @@ export const METRIC_TIPS: Record<string, string> = {
 
 export const METRIC_LEVEL_LABEL = { ok: 'im grünen Bereich', warn: 'Achtung', crit: 'kritisch' } as const;
 
-export const METRIC_OPEN_HINT = 'Klicken zeigt den Verlauf.';
+export const METRIC_OPEN_HINT = 'Klicken öffnet die Statistik mit dem Verlauf dieses Werts.';

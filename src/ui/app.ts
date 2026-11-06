@@ -7,7 +7,8 @@ import { unproject } from '../render/iso';
 import { FIELDS, NEIGHBOR_FIELDS, PLANT, VILLAGE } from '../render/layout';
 import { GameController } from './game';
 import { MetricsBar } from './metrics';
-import { PANELS, panelIcon, type PanelDef } from './panels';
+import { PANELS, panelIcon, panelPreview, type PanelDef } from './panels';
+import type { DifficultyId } from '../sim/difficulty';
 import { Ticker } from './ticker';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
@@ -94,7 +95,7 @@ export class App {
       time.append(b);
     }
     this.brandEl = h('div', { class: 'brand' }, 'Biogas-Anlage');
-    const statsBtn = h('button', { type: 'button', class: 'stats-btn', 'data-tip': TIPS.stats, onclick: () => this.openStats() }, svg(ICONS.chart), h('span', { class: 'stats-btn__label' }, 'Verlauf'));
+    const statsBtn = h('button', { type: 'button', class: 'stats-btn', 'data-tip': TIPS.stats, onclick: () => this.openStats() }, svg(ICONS.chart), h('span', { class: 'stats-btn__label' }, 'Statistik'));
     const header = h('header', { class: 'topbar' },
       this.brandEl,
       h('div', { class: 'calendar', 'aria-live': 'polite' }, this.dateEl, this.metaEl),
@@ -257,11 +258,31 @@ export class App {
 
   /** Bereiche, die es in der Stufe des Durchlaufs nicht gibt, verschwinden aus der Leiste. */
   private updateRail(s: GameState): void {
+    this.previewRail(null);
     for (const p of PANELS) {
       const btn = this.rail.querySelector(`[data-panel="${p.id}"]`) as HTMLElement | null;
       if (btn) btn.hidden = p.available ? !p.available(s) : false;
     }
     if (this.openPanel && !this.panelAvailable(this.openPanel.id)) this.close();
+  }
+
+  /**
+   * Vorschau im Startmenü: Bereiche, die in der gewählten Stufe wegfallen, grau schraffiert;
+   * eingeschränkte Bereiche mit Markierung. null beendet die Vorschau.
+   */
+  previewRail(level: DifficultyId | null): void {
+    const preview = level ? panelPreview(level) : null;
+    for (const p of PANELS) {
+      const btn = this.rail.querySelector(`[data-panel="${p.id}"]`) as HTMLElement | null;
+      if (!btn) continue;
+      const pv = preview?.find((x) => x.id === p.id);
+      if (!pv) {
+        delete btn.dataset.preview;
+        continue;
+      }
+      btn.hidden = false;
+      btn.dataset.preview = pv.state;
+    }
   }
 
   private panelAvailable(id: string): boolean {
@@ -405,7 +426,7 @@ export class App {
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     // Solange Startmenü oder Analyse offen sind, gelten die Spieltasten nicht
     if (!this.endOverlay.hidden) return;
-    if (e.key.toLowerCase() === 'v') {
+    if (e.key.toLowerCase() === 's') {
       if (this.statsOverlay.hidden) this.openStats();
       else this.closeStats();
       return;
@@ -438,9 +459,9 @@ export class App {
     this.showOverlay(view);
   }
 
-  // ---------- Verlauf während des Spiels ----------
+  // ---------- Statistik während des Spiels ----------
 
-  /** Verlauf bisher öffnen; das Spiel pausiert, bis die Ansicht geschlossen wird. */
+  /** Statistik bis heute öffnen; das Spiel pausiert, bis die Ansicht geschlossen wird. */
   openStats(focus?: string): void {
     if (this.game.over || !this.endOverlay.hidden) return;
     if (this.statsOverlay.hidden) this.statsResume = this.game.speed;

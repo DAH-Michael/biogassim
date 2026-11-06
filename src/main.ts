@@ -85,6 +85,7 @@ function showMenu(): void {
     difficulty: lastScenario.difficulty,
     tutorial: lastScenario.tutorial,
     plantName: lastScenario.plantName,
+    onLevelPreview: (level) => app.previewRail(level),
   }));
 }
 

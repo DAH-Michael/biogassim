@@ -1,4 +1,4 @@
-import { CONFIG, SUBSTRATES, STAFF_ROLES, type BuildKind, type StaffRole, type SubstrateId } from '../sim/config';
+import { CONFIG, SUBSTRATES, STAFF_ROLES, type BuildKind, type Feature, type StaffRole, type SubstrateId } from '../sim/config';
 import { dateOfDay, dayOfDate, formatDate, inWindow, windowDays } from '../sim/calendar';
 import { guelleAvailability, offerOpen, offerPrice, spotPrice } from '../sim/contracts';
 import { defaultHarvestDay, fieldConfig, harvestWindowFor } from '../sim/fields';
@@ -9,7 +9,7 @@ import type { Action, Crop, GameState } from '../sim/types';
 import type { ActionResult } from '../sim/actions';
 import { fmt, h, svg } from './dom';
 import { TIPS } from '../content/tooltips.de';
-import { buildAvailable, hasFeature, roleAvailable } from '../sim/difficulty';
+import { buildAvailable, hasFeature, roleAvailable, type DifficultyId } from '../sim/difficulty';
 import { ICONS, type IconName } from './icons';
 
 /**
@@ -29,6 +29,8 @@ export interface PanelDef {
   render: (ctx: PanelCtx) => HTMLElement;
   /** Bereich nur in bestimmten Stufen */
   available?: (s: GameState) => boolean;
+  /** Teilfunktionen, die es nur in höheren Stufen gibt (für die Vorschau im Startmenü) */
+  limits?: { feature: Feature; label: string }[];
 }
 
 const SUBSTRATE_NAMES: Record<SubstrateId, string> = { mais: 'Maissilage', gruenroggen: 'Grünroggensilage', guelle: 'Rindergülle', reststoff: 'Reststoffe' };
@@ -358,14 +360,26 @@ function financePanel(ctx: PanelCtx): HTMLElement {
 
 export const PANELS: PanelDef[] = [
   { id: 'feed', title: 'Fütterung', icon: 'feed', key: 'f', render: feedPanel },
-  { id: 'supply', title: 'Beschaffung', icon: 'truck', key: 'b', render: supplyPanel },
-  { id: 'fields', title: 'Felder', icon: 'field', key: 'a', render: fieldsPanel, available: (s) => hasFeature(s, 'felder') },
-  { id: 'tech', title: 'Technik', icon: 'wrench', key: 't', render: techPanel },
-  { id: 'staff', title: 'Personal', icon: 'users', key: 'p', render: staffPanel, available: (s) => hasFeature(s, 'personal') },
+  { id: 'supply', title: 'Beschaffung', icon: 'truck', key: 'b', render: supplyPanel, limits: [{ feature: 'reststoffe', label: 'Reststoffe' }] },
+  { id: 'fields', title: 'Felder', icon: 'field', key: 'a', render: fieldsPanel, available: (s) => hasFeature(s, 'felder'), limits: [{ feature: 'felder_experten', label: 'Zweikultur und eigener Erntetermin' }] },
+  { id: 'tech', title: 'Technik', icon: 'wrench', key: 't', render: techPanel, limits: [{ feature: 'entschwefelung', label: 'Entschwefelung' }, { feature: 'instandsetzung', label: 'Instandsetzung' }] },
+  { id: 'staff', title: 'Personal', icon: 'users', key: 'p', render: staffPanel, available: (s) => hasFeature(s, 'personal'), limits: [{ feature: 'personal_experten', label: 'Agrarberaterin und Energievermarkter' }] },
   { id: 'dig', title: 'Gärrest', icon: 'droplet', key: 'g', render: digestatePanel },
-  { id: 'build', title: 'Ausbau und Dorf', icon: 'build', key: 'u', render: buildPanel },
+  { id: 'build', title: 'Ausbau und Dorf', icon: 'build', key: 'u', render: buildPanel, limits: [{ feature: 'ausbau_erweitert', label: 'Gasspeicher- und Siloausbau' }] },
   { id: 'money', title: 'Finanzen', icon: 'coins', key: 'k', render: financePanel },
 ];
+
+export interface PanelPreview { id: string; title: string; state: 'full' | 'limited' | 'off'; missing: string[] }
+
+/** Welche Bereiche in einer Stufe fehlen oder eingeschränkt sind (Vorschau im Startmenü). */
+export function panelPreview(level: DifficultyId): PanelPreview[] {
+  const probe = { scenario: { id: 'altanlage', difficulty: level } } as unknown as GameState;
+  return PANELS.map((p) => {
+    if (p.available && !p.available(probe)) return { id: p.id, title: p.title, state: 'off' as const, missing: [] };
+    const missing = (p.limits ?? []).filter((l) => !hasFeature(probe, l.feature)).map((l) => l.label);
+    return { id: p.id, title: p.title, state: missing.length ? 'limited' as const : 'full' as const, missing };
+  });
+}
 
 export function panelIcon(name: IconName): SVGElement {
   return svg(ICONS[name]);

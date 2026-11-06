@@ -7,6 +7,7 @@ import { TIPS } from '../content/tooltips.de';
 import { advisorPortrait } from './portrait';
 import { saveCodeView } from './savecodeView';
 import { codeForKeys } from '../meta/progression';
+import { panelPreview } from './panels';
 
 /**
  * Startmenü: Ausgangslage, Startszenario, freigeschaltete Werkzeuge, Speichercode.
@@ -21,6 +22,8 @@ export interface MenuOptions {
   tutorial?: boolean;
   /** zuletzt gewählter Anlagenname (nur im Speicher) */
   plantName?: string;
+  /** gewählte Stufe in der Leiste links vorschauen */
+  onLevelPreview?: (level: NonNullable<ScenarioOptions['difficulty']>) => void;
 }
 
 const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs?: string }[] = [
@@ -93,10 +96,25 @@ export function buildMenu(o: MenuOptions): HTMLElement {
     ...LEVELS.map((lv) => {
       const id = `lv-${lv.id}`;
       const input = h('input', { type: 'radio', name: 'level', id, value: lv.id, checked: lv.id === level }) as HTMLInputElement;
-      input.addEventListener('change', () => { level = lv.id; });
+      input.addEventListener('change', () => { level = lv.id; showPreview(); });
       return h('label', { class: 'choice', for: id, 'data-tip': lv.tip }, input, h('span', { class: 'choice__body' }, h('strong', {}, lv.title), h('span', {}, lv.text)));
     }),
   );
+
+  // Vorschau: was in der Stufe links in der Leiste fehlt oder eingeschränkt ist
+  const previewText = h('p', { class: 'level-preview', 'aria-live': 'polite' });
+  const showPreview = () => {
+    o.onLevelPreview?.(level);
+    const pv = panelPreview(level);
+    const off = pv.filter((p) => p.state === 'off').map((p) => p.title);
+    const limited = pv.filter((p) => p.state === 'limited').map((p) => `${p.title} (ohne ${p.missing.join(', ')})`);
+    const parts: (string | HTMLElement)[] = [];
+    if (!off.length && !limited.length) parts.push('Alle Bereiche links in der Leiste mit vollem Umfang.');
+    if (off.length) parts.push(h('span', { class: 'level-preview__off' }, 'Fällt weg'), ` ${off.join(', ')}. `);
+    if (limited.length) parts.push(h('span', { class: 'level-preview__limited' }, 'Eingeschränkt'), ` ${limited.join('; ')}.`);
+    previewText.replaceChildren(...parts);
+  };
+  showPreview();
 
   // Tutorial-Modus: Schalter zusätzlich zur Schwierigkeit
   const sw = h('input', { type: 'checkbox', role: 'switch', id: 'opt-tutorial', class: 'switch__input', checked: tutorial }) as HTMLInputElement;
@@ -165,7 +183,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
       start,
     ),
     h('section', { class: 'menu__section' }, h('h3', {}, 'Startszenario'), scenarioList, ...options),
-    h('section', { class: 'menu__section' }, h('h3', {}, 'Schwierigkeit'), levelList, tutorialSwitch),
+    h('section', { class: 'menu__section' }, h('h3', {}, 'Schwierigkeit'), levelList, previewText, tutorialSwitch),
     knowledge,
     codeSection,
   );

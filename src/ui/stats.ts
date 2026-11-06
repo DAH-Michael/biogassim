@@ -6,7 +6,7 @@ import { buildTimeline } from './charts';
 import { fmt, h } from './dom';
 
 /**
- * Verlauf während des Durchlaufs: Kennzahlen bis heute und die Verläufe seit dem 1. August.
+ * Statistik während des Durchlaufs: Kennzahlen bis heute und die Verläufe seit dem 1. August.
  * Zeigt nur, was auch der Betreiber wissen kann (Laborwerte statt wahrem FOS/TAC).
  * Das Spiel ist pausiert, solange die Ansicht offen ist.
  */
@@ -33,8 +33,8 @@ export function buildStats(s: GameState, o: StatsOptions): HTMLElement {
   const view = h('div', { class: 'analysis stats' },
     h('header', { class: 'analysis__head' },
       h('p', { class: 'eyebrow' }, `${o.plantName ?? 'Ihre Anlage'}, Stand ${formatDate(day)}`),
-      h('h2', { id: 'stats-title' }, 'Verlauf bisher'),
-      h('p', { class: 'analysis__sentence' }, 'Alle Werte seit der Übernahme am 1. August. Beim FOS/TAC sehen Sie, was das Labor gemessen hat.'),
+      h('h2', { id: 'stats-title' }, 'Statistik'),
+      h('p', { class: 'analysis__sentence' }, 'Kennzahlen und Verläufe seit der Übernahme am 1. August. Beim FOS/TAC sehen Sie, was das Labor gemessen hat.'),
       h('div', { class: 'row' }, close),
     ),
     h('dl', { class: 'figures' }, ...rows.map(([k, v]) => h('div', { class: 'figure' }, h('dt', {}, k), h('dd', {}, v)))),
