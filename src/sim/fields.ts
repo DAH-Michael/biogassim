@@ -4,6 +4,7 @@ import { logEvent } from './eventlog';
 import { round } from './biology';
 import { gaussian } from './rng';
 import { say } from './messages';
+import { hasFeature } from './difficulty';
 import { hasStaff, ledger, type SiloDelivery } from './storage';
 import type { FieldState, GameState } from './types';
 
@@ -50,7 +51,7 @@ export function fieldsDay(state: GameState): FieldDayResult {
       field.status = 'frei';
       field.standing = 'leer';
       field.growth = 0;
-      say(state, 'landwirt', 'feld_frei', { feld: cfg.name, ha: cfg.ha });
+      if (hasFeature(state, 'felder')) say(state, 'landwirt', 'feld_frei', { feld: cfg.name, ha: cfg.ha });
     }
     if (field.status !== 'gefuehrt') continue;
 

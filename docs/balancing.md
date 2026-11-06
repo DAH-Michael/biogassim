@@ -79,14 +79,16 @@ Jeder Versuch deckt ein neues Teilsystem auf, und jedes Scheitern schaltet ein p
 
 ## Personal
 
-| Fachkraft | Wirkung in ruhigen Jahren | Wirkung im Risiko |
-|---|---|---|
-| Verfahrenstechniker | Gewinn etwa gleich, Gasverluste 3,3 statt 5,5 %, fast immer „Gut geführt“ | weniger und kürzere Ausfälle, Wartung und Entschwefelung laufen von selbst |
-| Energievermarkter | rund 40.000 € mehr Gewinn, mit größerem Gasspeicher mehr | keine |
-| Agrarberaterin | etwas weniger Gewinn ohne eigene Felder (bessere Preise und Silage gleichen die Kosten fast aus) | mehr Gärrestabnehmer, bessere Erträge eigener Felder |
-| Biologin | kostet etwa ihr Gehalt; der Mehrertrag wirkt nur, wenn der Spieler die Fütterung entsprechend senkt | verhindert den biologischen Totalausfall bei Überfütterung (2 statt 49 von 50) und bei reinem Mais |
+Nach dem ersten Test auf realistische Vollzeitkosten umgestellt (Arbeitgeberkosten pro Monat, brutto plus rund 21 % Sozialabgaben): Biologin 5.700 €, Verfahrenstechniker 5.000 €, Agrarberaterin 5.200 €, Energievermarkter 5.800 €. Die Wirkungen sind auf plausible Größen gesetzt: Der Techniker macht kleine Wartungen selbst und stellt den Motor nach (1,5 % mehr elektrischer Wirkungsgrad), der Vermarkter erzielt 2 ct/kWh Mehrerlös, die Agrarberaterin 10 % bessere Preise, die Biologin 5 % Mehrertrag.
 
-Die Biologin rechnet sich also nur, wenn es riskant wird. Das halte ich für ehrlich: Fachwissen ist eine Versicherung, kein Bonus. Wer will, dass sie sich auch im ruhigen Betrieb sichtbar lohnt, kann ihren Mehrertrag in `config.ts` erhöhen.
+| Fachkraft (je 30 Seeds) | Normal: Gewinn ggü. ohne Personal | Real: Gewinn ggü. ohne Personal | Wirkung im Risiko |
+|---|---|---|---|
+| Verfahrenstechniker | rund +4.000 € | rund +12.000 € | Gasverluste 3,3 statt 5,3 %, fast immer „Gut geführt“ |
+| Energievermarkter | nur in Real | rund +11.000 € | keine |
+| Agrarberaterin | nur in Real | rund −46.000 € ohne eigene Felder | bessere Erträge eigener Felder, mehr Gärrestabnehmer |
+| Biologin | rund −57.000 € | rund −68.000 € | verhindert den biologischen Totalausfall bei Überfütterung und bei reinem Mais |
+
+Biologin und Agrarberaterin rechnen sich an einer einzelnen 500-kW-Anlage in ruhigen Jahren nicht. Das entspricht der Praxis: Kleinere Anlagen kaufen biologische Betreuung und Agrarberatung meist als Dienstleistung zu, statt Fachleute fest anzustellen. Ihr Wert zeigt sich im Risiko. Wer möchte, dass sich auch diese Rollen im Spiel als Festanstellung lohnen, bräuchte entweder größere Anlagen oder ein Modell „Dienstleister statt Festanstellung“ mit geringeren Kosten und schwächerer Wirkung.
 
 ## Szenarien
 
@@ -130,3 +132,51 @@ Mit weniger Gülle in der Nähe reißen die üblichen Strategien den Maisdeckel.
 3. **Der Totalschaden bei aufgeschobener Wartung kommt früh** (Mitte November). Wer das Spiel länger erleben soll, bevor es endet, sollte den Startverschleiß oder den Verschleißzuschlag senken.
 4. **Wärmeleitung und Ausbauten lohnen sich in einem einzigen Jahr nur über die Bewertung**, nicht im Kontostand. Mehrjährige Durchläufe würden das ändern (bewusst nicht im Prototyp).
 5. **Testspieler sind keine Menschen.** Vor der Vorführung bei der Geschäftsführung sollten zwei oder drei Personen ohne Vorwissen spielen. Interessant ist vor allem, ob die Meldungen aus der Welt als Hinweise verstanden werden und ob die Analyse nach dem ersten Scheitern gelesen wird.
+
+## Schwierigkeitsgrade (nach dem ersten Test ergänzt)
+
+Die Stufen ändern Funktionsumfang und Simulationstiefe, nicht das Startszenario. Werte in `CONFIG.difficulty`, Zuordnung der Funktionen in `features`. Gesperrte Entscheidungen lehnt die Simulation ab, die Oberfläche zeigt sie nicht.
+
+| Funktion | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| Fütterung, Mais- und Grünroggenverträge, Gülle, Nachkauf | ja | ja | ja |
+| kleine Wartung, Gärrest ausbringen, Finanzen, Dorf | ja | ja | ja |
+| Ausbau: Gärrestlager, Abdeckung, Wärmeleitung | ja | ja | ja |
+| Entschwefelung | nein | ja | ja |
+| Reststoffmarkt | nein | ja | ja |
+| eigene Felder (Pacht, Kultur Mais oder Grünroggen) | nein | ja | ja |
+| Instandsetzung BHKW | nein | ja | ja |
+| Ausbau: größerer Gasspeicher, zweites Fahrsilo | nein | ja | ja |
+| Personal: Biologin, Verfahrenstechniker | nein | ja | ja |
+| Personal: Agrarberaterin, Energievermarkter | nein | nein | ja |
+| Zweikultur und eigener Erntetermin | nein | nein | ja |
+
+| Simulationstiefe | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| Spurenelemente, Stress durch Futterwechsel | nein | ja | ja, Wechsel belasten stärker |
+| Wachstum der Methanbildner | schneller | normal | langsamer |
+| Laborwert FOS/TAC | täglich | wöchentlich, 3 Tage Verzug | wöchentlich, 5 Tage Verzug, ungenauer |
+| zufällige BHKW-Störungen | nein | ja | mehr |
+| Verdichtungsverluste im Silo, Störstoffe | nein | ja | ja, Reststoffe schwanken stärker |
+| Dürrejahr | nie | 15 % | 25 % |
+| Netzausfälle, Rührwerksstörungen | nein | nein | ja |
+
+Sperrfrist und Maisdeckel gelten in allen Stufen. Der naive erste Versuch scheitert deshalb überall am Gärrestlager.
+
+Ergebnisse (je 30 Seeds, Altanlage):
+
+| Strategie | Vereinfacht | Normal | Real |
+|---|---|---|---|
+| naiv | scheitert immer (Lager) | scheitert immer (Lager) | scheitert immer (Lager) |
+| versuch2 (Ausbringung, keine Wartung) | scheitert (BHKW-Totalschaden im März, danach kühlt der Fermenter aus) | scheitert (BHKW im November) | scheitert (BHKW im November) |
+| versuch3 | gelingt immer, Ø 129.000 € | gelingt immer, Ø 32.000 € | gelingt immer, Ø −19.000 € |
+| kein_personal | gelingt immer, Ø 134.000 € | gelingt immer, Ø 45.000 € | gelingt in 29 von 30, Ø 5.000 € |
+| vorbildlich | immer „Vorbildlich“ (ohne Personal, das es hier nicht gibt) | 6 von 30 „Vorbildlich“ (ohne Vermarkter) | 13 von 30 „Vorbildlich“ |
+
+In „Vereinfacht“ ist ein gutes Jahr leicht zu erreichen. Das ist gewollt: Die Stufe zeigt die Grundzusammenhänge, ohne mit Details zu überfordern.
+
+## Eigenstrom und leeres Silo
+
+Der Eigenstrombedarf besteht aus einer Grundlast von 15 kW (Rührwerke, Pumpen, Steuerung, Gaskühlung) und 4 % der Erzeugung, bei Volllast zusammen rund 7 %. Deckt die Erzeugung den Eigenbedarf nicht, wird Netzstrom zu 0,25 €/kWh gekauft. Vorher war der Eigenstrom ein fester Anteil der Erzeugung und fiel bei Teillast unrealistisch mit ab.
+
+Prüfung „Silo leer, nichts nachkaufen“ (Altanlage, Normal, Wartung erledigt): Die Gasproduktion fällt nach dem letzten Mais in vier Tagen auf etwa 70 %, nach zwölf Tagen auf etwa 30 % und pendelt sich dann bei rund 15 % ein, getragen nur von der Gülle. Die Abwärme reicht dann im Winter nicht mehr, der Fermenter kühlt von November bis Februar aus und die Biologie kippt Anfang März. Der schnelle Abfall in den ersten zwei Wochen ist fachlich plausibel (leicht abbaubare Silage). Der Nachlauf ist eher etwas zu kurz, weil der Abbau mit nur einer Fraktion je Substrat modelliert ist; eine langsame Faserfraktion würde den Rest über einige Wochen strecken. Offener Punkt: Die Fixkosten von 8.500 € im Monat sind für eine 500-kW-Anlage eher knapp, deshalb verliert der Betrieb im Stillstand vergleichsweise wenig Geld. Richtwert, fachlich prüfen.

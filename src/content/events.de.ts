@@ -83,6 +83,8 @@ export function describeEvent(e: SimEvent): EventText {
     case 'service_major': return { title: 'BHKW instand gesetzt', text: `Kosten ${n(d.costEur)} €, Stillstand ${n(d.days)} Tage.` };
     case 'desulf_empty': return { title: 'Entschwefelungsmittel verbraucht', text: `Ohne Mittel bleibt deutlich mehr Schwefelwasserstoff im Gas (${n(d.cleanPpm)} statt weniger als 30 ppm). Im Motor wird daraus Schwefelsäure, die Lager und Öl angreift.` };
     case 'desulf_refilled': return { title: 'Entschwefelung nachgefüllt', text: `Kosten ${n(d.costEur)} €.` };
+    case 'grid_outage': return { title: 'Netzausfall', text: `Das Stromnetz ist gestört. Das BHKW darf nicht einspeisen und schaltet für ${n(d.days)} Tag ab.` };
+    case 'stirrer_failure': return { title: 'Rührwerk gestört', text: `Ein Rührwerk ist ausgefallen. ${n(d.days)} Tage nur halbe Feststoffzufuhr, Reparatur ${n(d.costEur)} €.` };
     case 'chp_failure': return { title: 'BHKW-Störung', text: `Das BHKW steht ${n(d.days)} Tage, Reparatur ${n(d.costEur)} €. Verschleiß jetzt ${pct(d.wear)}.` };
     case 'chp_restart': return { title: 'BHKW läuft wieder', text: '' };
     case 'chp_destroyed': return { title: 'BHKW-Totalschaden', text: `Der Motor ist irreparabel beschädigt (Verschleiß ${pct(d.wear)}). Ein Ersatz kostet ${n(d.costEur)} €.` };

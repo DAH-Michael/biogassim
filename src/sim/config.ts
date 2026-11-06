@@ -42,10 +42,10 @@ export const CONFIG = {
     runDays: 365,
     /** Starttag: 1. August, aus der Arbeitsanweisung */
     startDate: [8, 1] as MonthDay,
-    /** Echtzeit-Sekunden pro Spieltag bei einfacher Geschwindigkeit (10 min pro Jahr), Vorgabe */
-    realSecondsPerDayAt1x: 600 / 365,
+    /** Echtzeit-Sekunden pro Spieltag bei normaler Geschwindigkeit (20 min pro Jahr, Rückmeldung nach dem ersten Test) */
+    realSecondsPerDayAt1x: 1200 / 365,
     /** Wählbare Geschwindigkeiten */
-    speeds: [0, 1, 2] as readonly number[],
+    speeds: [0, 1, 2, 4] as readonly number[],
     /** Maximaler Zeitraffer im Debug-Modus */
     debugMaxSpeed: 50,
     /** Anzahl Tage für die Vorlaufsimulation der Biologie beim Start (stationärer Zustand) */
@@ -62,8 +62,15 @@ export const CONFIG = {
     chpEtaTh: 0.43,
     /** kWh Heizwert pro m³ Methan. Richtwert, fachlich prüfen */
     methaneKwhPerM3: 10,
-    /** Eigenstrombedarf der Anlage als Anteil der Erzeugung. Richtwert, fachlich prüfen */
-    ownPowerShare: 0.07,
+    /**
+     * Eigenstrombedarf: Grundlast (Rührwerke, Pumpen, Steuerung, Gaskühlung laufen auch ohne
+     * Gas weiter) plus ein Anteil der Erzeugung. Bei Volllast zusammen etwa 7 %.
+     * Richtwert, fachlich prüfen
+     */
+    ownPowerBaseKw: 15,
+    ownPowerShare: 0.04,
+    /** Bezugspreis für Netzstrom, wenn die eigene Erzeugung den Eigenbedarf nicht deckt, €/kWh. Richtwert, fachlich prüfen */
+    gridPurchaseEurPerKwh: 0.25,
     /** Arbeitsvolumen Hauptfermenter, m³. Richtwert, fachlich prüfen */
     fermenterVolumeM3: 3600,
     /** Arbeitsvolumen Nachgärer, m³. Richtwert, fachlich prüfen */
@@ -221,6 +228,8 @@ export const CONFIG = {
     measurement: {
       /** externes Labor ohne Personal: wöchentliche Probe, 3 Tage Verzug. Richtwert, fachlich prüfen */
       external: { intervalDays: 7, delayDays: 3, noise: 0.05, costEur: 150 },
+      /** Stufe Real: Probe wöchentlich, Ergebnis nach 5 Tagen, ungenauer. Richtwert, fachlich prüfen */
+      slow: { intervalDays: 7, delayDays: 5, noise: 0.07, costEur: 150 },
       /** mit Biologin: zweimal pro Woche, 1 Tag Verzug */
       biologist: { intervalDays: 3, delayDays: 1, noise: 0.03, costEur: 150 },
       /** eigenes Labor (Freischaltung): täglich, ohne Verzug */
@@ -504,7 +513,7 @@ export const CONFIG = {
       maxTPerOrder: 300,
     },
     /** Agrarberaterin: Preisnachlass bei Vertragsabschluss */
-    advisorPriceDiscount: 0.08,
+    advisorPriceDiscount: 0.1,
     /** Agrarberaterin: Silagequalität aus Lieferverträgen (berät Erntezeitpunkt und Verdichtung). Richtwert, fachlich prüfen */
     advisorContractQuality: 0.9,
   },
@@ -536,13 +545,20 @@ export const CONFIG = {
     contaminantFeedFactor: 0.5,
   },
 
-  /** Personal. Kosten inklusive Nebenkosten, €/Monat, anteilig für diese Anlage (Teilzeit oder geteilt mit Nachbaranlagen, Annahme). Richtwert, fachlich prüfen */
+  /**
+   * Personal in Vollzeit. Arbeitgeberkosten pro Monat: Bruttogehalt plus rund 21 % Sozialabgaben
+   * (Annahme ländlicher Raum Ostdeutschland, Stand 2026). Richtwert, fachlich prüfen.
+   * Biologin: Master Agrar- oder Biowissenschaften, brutto rund 4.700 €.
+   * Verfahrenstechniker: staatlich geprüfter Techniker oder Meister, brutto rund 4.100 €.
+   * Agrarberaterin: Agraringenieurin, brutto rund 4.300 €.
+   * Energievermarkter: Energiewirtschaft mit Handelserfahrung, brutto rund 4.800 €.
+   */
   staff: {
     roles: {
-      biologin: { salaryEurPerMonth: 2500 },
-      techniker: { salaryEurPerMonth: 3500 },
-      agrar: { salaryEurPerMonth: 2000 },
-      vermarkter: { salaryEurPerMonth: 2500 },
+      biologin: { salaryEurPerMonth: 5700 },
+      techniker: { salaryEurPerMonth: 5000 },
+      agrar: { salaryEurPerMonth: 5200 },
+      vermarkter: { salaryEurPerMonth: 5800 },
     },
     /** Einarbeitung bis zur Wirkung, Tage */
     onboardingDays: 14,
@@ -551,13 +567,17 @@ export const CONFIG = {
     /** Biologin: maximale Änderung der tatsächlichen Mischung pro Tag (sanfter Wechsel) */
     biologistRampPerDay: 0.015,
     /** Biologin: Mehrertrag durch bessere Prozessführung (Enzyme, Spurenelemente, Rührzeiten), Anteil. Richtwert, fachlich prüfen */
-    biologistYieldBonus: 0.04,
+    biologistYieldBonus: 0.05,
     /** Biologin: Spurenelementdosierung, € pro t oTS */
     traceDosingEurPerTots: 4,
     /** Techniker: Faktor auf Ausfallwahrscheinlichkeit, Verschleiß und Stillstandsdauer */
-    technicianFailureFactor: 0.55,
+    technicianFailureFactor: 0.4,
     technicianWearFactor: 0.85,
     technicianDowntimeFactor: 0.5,
+    /** Techniker macht kleine Wartungen selbst: nur Teile, keine Monteurstunden (Anteil der Kosten) */
+    technicianServiceCostFactor: 0.4,
+    /** Techniker stellt den Motor nach (Zündung, Gemisch): relativer Gewinn an elektrischem Wirkungsgrad */
+    technicianEtaBonus: 0.015,
     /** Techniker beauftragt kleine Wartung ... Stunden vor Fälligkeit */
     technicianServiceLeadH: 100,
     /** Techniker füllt Entschwefelung nach unter ... Tagen Vorrat */
@@ -566,7 +586,7 @@ export const CONFIG = {
     advisorYieldBonus: 0.08,
     advisorDemandBonus: 0.35,
     /** Energievermarkter: Zusatzerlös €/kWh plus je Stunde Gasspeicher über Referenz */
-    marketerBaseEurPerKwh: 0.016,
+    marketerBaseEurPerKwh: 0.02,
     marketerPerStorageHourEurPerKwh: 0.0015,
     marketerReferenceStorageHours: 6,
   },
@@ -660,6 +680,33 @@ export const CONFIG = {
     bankNoticeShare: 0.8,
   },
 
+  /**
+   * Warnfarben der Kennwertleiste: ab wann ein Wert als bedenklich (warn) oder kritisch (crit)
+   * angezeigt wird. Nur Anzeige, keine Spielbalance. Richtwert, fachlich prüfen
+   */
+  metricWarnings: {
+    /** Gasproduktion als Anteil des Bedarfs für Volllast */
+    gasShareWarn: 0.8,
+    gasShareCrit: 0.55,
+    /** FOS/TAC: warn etwas unter der Warnschwelle der Biologie, kritisch ab der Warnschwelle */
+    fosTacWarn: 0.42,
+    /** Fermentertemperatur: warn unter dem Optimum, kritisch ab der Kältemeldung */
+    tempWarnC: 37,
+    tempCritC: 36,
+    /** Gasspeicher: fast voll heißt bald Fackel, fast leer heißt BHKW drosselt */
+    storeHighWarn: 0.9,
+    storeLowWarn: 0.1,
+    /** Silovorrat in Tagen bei aktueller Fütterung */
+    siloDaysWarn: 21,
+    siloDaysCrit: 7,
+    /** Gärrestlager */
+    digestateWarn: 0.7,
+    /** Kontostand: warn unter null, kritisch ab der Bankmeldung */
+    balanceWarnEur: 0,
+    /** Akzeptanz: warn unter diesem Wert, kritisch unter acceptance.warningLevel */
+    acceptanceWarn: 40,
+  },
+
   /** Maisdeckel: Höchstanteil Mais an der Inputmasse. OFFENER PUNKT: aktuelle EEG-Regelung klären. Richtwert, fachlich prüfen */
   maizeCap: {
     maxShare: 0.40,
@@ -689,6 +736,57 @@ export const CONFIG = {
   messages: {
     /** Landwirt bietet Stoppelflächen für Gärrest an */
     stubbleDigestate: [8, 6] as MonthDay,
+  },
+
+  /**
+   * Schwierigkeitsgrade: verändern die Simulationstiefe, unabhängig vom Startszenario.
+   * Sperrfrist und Maisdeckel gelten in allen Stufen, weil sie die Kernaussagen tragen.
+   */
+  difficulty: {
+    vereinfacht: {
+      /** Spurenelemente spielen keine Rolle */
+      traceElements: false,
+      /** Faktor auf die Belastung durch abrupte Substratwechsel */
+      shiftStressFactor: 0,
+      /** Faktor auf das Wachstum der Methanbildner */
+      growthFactor: 1.3,
+      /** Messniveau FOS/TAC ohne Personal: 'lab' täglich, 'external' wöchentlich, 'slow' wöchentlich mit längerem Verzug */
+      measurement: 'lab' as 'lab' | 'external' | 'slow',
+      /** Faktor auf zufällige BHKW-Störungen */
+      chpFailureFactor: 0,
+      /** Entschwefelungsmittel verbraucht sich */
+      desulfConsumable: false,
+      /** Verdichtung im Fahrsilo beeinflusst die Qualität */
+      siloCompaction: false,
+      /** Faktoren auf Störstoffrisiko und Qualitätsstreuung der Reststoffe */
+      contaminantFactor: 0,
+      residueSigmaFactor: 0.5,
+      /** Wahrscheinlichkeit eines Dürrejahrs */
+      droughtChance: 0,
+      /** Netzausfall und Rührwerksstörung je Tag (nur in Real) */
+      gridOutagePerDay: 0,
+      stirrerFailurePerDay: 0,
+      /** Verfügbare Funktionen dieser Stufe (Schlüssel siehe FEATURES unten) */
+      features: [] as readonly Feature[],
+    },
+    normal: {
+      traceElements: true, shiftStressFactor: 1, growthFactor: 1, measurement: 'external' as 'lab' | 'external' | 'slow',
+      chpFailureFactor: 1, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1, residueSigmaFactor: 1,
+      droughtChance: 0.15, gridOutagePerDay: 0, stirrerFailurePerDay: 0,
+      features: ['entschwefelung', 'reststoffe', 'felder', 'instandsetzung', 'ausbau_erweitert', 'personal'] as readonly Feature[],
+    },
+    real: {
+      traceElements: true, shiftStressFactor: 1.3, growthFactor: 0.85, measurement: 'slow' as 'lab' | 'external' | 'slow',
+      chpFailureFactor: 1.4, desulfConsumable: true, siloCompaction: true, contaminantFactor: 1.5, residueSigmaFactor: 1.3,
+      droughtChance: 0.25, gridOutagePerDay: 0.004, stirrerFailurePerDay: 0.003,
+      features: ['entschwefelung', 'reststoffe', 'felder', 'instandsetzung', 'ausbau_erweitert', 'personal', 'personal_experten', 'felder_experten'] as readonly Feature[],
+    },
+  },
+  /** Netzausfall: BHKW steht, Dauer in Tagen. Rührwerksstörung: halbe Feststoffzufuhr, Tage und Kosten. Richtwert, fachlich prüfen */
+  realEvents: {
+    gridOutageDays: 1,
+    stirrerDays: [2, 4] as const,
+    stirrerRepairEur: [3000, 9000] as const,
   },
 
   /** Startszenarien. Faktoren wirken auf Gülleangebot, Transportwege, Verkehrstoleranz und Akzeptanz. */
@@ -768,6 +866,20 @@ export const CONFIG = {
     minRelativeWeight: 0.15,
   },
 } as const;
+
+/**
+ * Funktionen, die je nach Schwierigkeitsgrad verfügbar sind. Grundfunktionen (Fütterung, Verträge,
+ * Gülle, Nachkauf, kleine Wartung, Ausbringung, Gärrestlager, Abdeckung, Wärmeleitung) gibt es immer.
+ */
+export type Feature =
+  | 'entschwefelung' // Verbrauchsmittel nachfüllen, H2S-Verschleiß
+  | 'reststoffe' // Reststoffmarkt
+  | 'felder' // Felder pachten, Kultur Mais oder Grünroggen
+  | 'felder_experten' // Zweikultur, eigener Erntetermin
+  | 'instandsetzung' // große Instandsetzung des BHKW
+  | 'ausbau_erweitert' // größerer Gasspeicher, zweites Fahrsilo
+  | 'personal' // Biologin, Verfahrenstechniker
+  | 'personal_experten'; // Agrarberaterin, Energievermarkter
 
 export interface SubstrateConfig {
   ts: number;

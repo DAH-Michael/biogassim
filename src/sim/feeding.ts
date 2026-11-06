@@ -1,7 +1,8 @@
 import { CONFIG, SUBSTRATES } from './config';
 import { logEvent } from './eventlog';
 import { round, sumMap, zeroMap } from './biology';
-import { range } from './rng';
+import { chance, intRange, range } from './rng';
+import { difficulty } from './difficulty';
 import { say } from './messages';
 import { hasStaff, ledger, silageCh4Factor } from './storage';
 import { takeGuelle } from './contracts';
@@ -38,6 +39,21 @@ export function feedingDay(state: GameState, playerChangedToday: boolean): FeedR
     want = { ...state.rampFeed };
   } else {
     state.rampFeed = null;
+  }
+
+  // Rührwerksstörung (Stufe Real): halbe Feststoffzufuhr für einige Tage
+  if (day >= state.contaminationUntilDay && chance(state.rng.tech, difficulty(state).stirrerFailurePerDay)) {
+    const R = CONFIG.realEvents;
+    const days = intRange(state.rng.tech, R.stirrerDays[0], R.stirrerDays[1]);
+    const cost = Math.round(range(state.rng.tech, R.stirrerRepairEur[0], R.stirrerRepairEur[1]));
+    const ev = logEvent(log, day, { type: 'stirrer_failure', severity: 'warning', causes: [state.origin.plant], data: { days, costEur: cost } });
+    state.contaminationEvent = ev.id;
+    state.contaminationStartDay = day;
+    state.contaminationUntilDay = day + days;
+    state.finance.balance -= cost;
+    ledger(state, 'reparatur', cost);
+    state.finance.lossCauses[ev.id] = (state.finance.lossCauses[ev.id] ?? 0) + cost;
+    say(state, 'betriebsleiter', 'ruehrwerk', { tage: days }, ev.id);
   }
 
   // Störstoffe: halbe Feststoffzufuhr

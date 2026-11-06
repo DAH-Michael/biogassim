@@ -8,10 +8,10 @@ import type { WeatherYear } from './types';
  * erzeugt. So ist das Wetter bei gleichem Seed immer gleich, unabhängig von
  * Entscheidungen des Spielers.
  */
-export function generateWeather(seed: number): WeatherYear {
+export function generateWeather(seed: number, droughtChance: number = CONFIG.weather.droughtChance): WeatherYear {
   const W = CONFIG.weather;
   const r: RngState = deriveRng(seed, 'weather');
-  const drought = chance(r, W.droughtChance);
+  const drought = chance(r, droughtChance);
   const days = [];
   let anomaly = 0;
   let raining = false;

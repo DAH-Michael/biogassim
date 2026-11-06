@@ -29,6 +29,8 @@ function el<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
 }
 
 interface SeriesDef {
+  /** Kennwert der Leiste, zu dem die Grafik gehört */
+  id: string;
   title: string;
   values: (s: GameState) => number[];
   format: (v: number) => string;
@@ -49,20 +51,21 @@ function blackoutBand() {
 }
 
 const SERIES: SeriesDef[] = [
-  { title: 'Gasproduktion', values: (s) => s.history.gasM3, format: (v) => `${fmt.int(v)} m³/Tag`, min: 0 },
+  { id: 'gas', title: 'Gasproduktion', values: (s) => s.history.gasM3, format: (v) => `${fmt.int(v)} m³/Tag`, min: 0 },
   {
-    title: 'FOS/TAC', values: (s) => s.history.fosTacTrue, format: (v) => fmt.dec(v, 2), min: 0,
+    id: 'fos', title: 'FOS/TAC', values: (s) => s.history.fosTacTrue, format: (v) => fmt.dec(v, 2), min: 0,
     lineLabel: 'im Fermenter', dots: (s) => s.measurement.history, dotsLabel: 'Laborwert',
     ref: { value: CONFIG.biology.fosTacWarning, label: 'Warnschwelle' },
   },
-  { title: 'Fermentertemperatur', values: (s) => s.history.tempC, format: (v) => `${fmt.dec(v, 1)} °C`, minSpan: 15 },
-  { title: 'Silovorrat', values: (s) => s.history.siloT, format: (v) => `${fmt.int(v)} t`, min: 0 },
+  { id: 'temp', title: 'Fermentertemperatur', values: (s) => s.history.tempC, format: (v) => `${fmt.dec(v, 1)} °C`, minSpan: 15 },
+  { id: 'store', title: 'Gasspeicher', values: (s) => s.history.gasStorageShare, format: (v) => fmt.pct(v), min: 0, ref: { value: 1, label: 'voll' } },
+  { id: 'silo', title: 'Silovorrat', values: (s) => s.history.siloT, format: (v) => `${fmt.int(v)} t`, min: 0 },
   {
-    title: 'Gärrestlager', values: (s) => s.history.digestateShare, format: (v) => fmt.pct(v), min: 0,
+    id: 'dig', title: 'Gärrestlager', values: (s) => s.history.digestateShare, format: (v) => fmt.pct(v), min: 0,
     ref: { value: 1, label: 'voll' }, band: blackoutBand(),
   },
-  { title: 'Kontostand', values: (s) => s.history.balance, format: (v) => fmt.eur(v), ref: { value: -CONFIG.finance.creditLimitEur, label: 'Kreditrahmen' } },
-  { title: 'Akzeptanz', values: (s) => s.history.acceptance, format: (v) => `${fmt.int(v)} von 100`, min: 0, ref: { value: CONFIG.acceptance.criticalLevel, label: 'kritisch' } },
+  { id: 'money', title: 'Kontostand', values: (s) => s.history.balance, format: (v) => fmt.eur(v), ref: { value: -CONFIG.finance.creditLimitEur, label: 'Kreditrahmen' } },
+  { id: 'acc', title: 'Akzeptanz', values: (s) => s.history.acceptance, format: (v) => `${fmt.int(v)} von 100`, min: 0, ref: { value: CONFIG.acceptance.criticalLevel, label: 'kritisch' } },
 ];
 const xOf = (day: number, days: number) => PAD_L + (day / Math.max(1, days - 1)) * (W - PAD_L - PAD_R);
 
@@ -85,7 +88,34 @@ function timelineEvents(s: GameState): { ev: SimEvent; kind: 'decision' | 'warni
     .map((ev) => ({ ev, kind: ev.playerDecision ? 'decision' as const : ev.severity === 'warning' ? 'warning' as const : ev.severity === 'info' ? 'warning' as const : 'critical' as const, chain: chain.has(ev.id) }));
 }
 
-export function buildTimeline(s: GameState): HTMLElement {
+/**
+ * Im laufenden Spiel kennt der Spieler nur die Laborwerte, nicht den wahren FOS/TAC.
+ * Die Linie zeigt dann den jeweils letzten bekannten Laborwert.
+ */
+function liveSeries(def: SeriesDef): SeriesDef {
+  if (def.id !== 'fos') return def;
+  return {
+    ...def,
+    lineLabel: 'letzter Laborwert',
+    values: (s) => {
+      const m = s.measurement.history;
+      const out: number[] = [];
+      let j = -1;
+      for (let d = 0; d < s.history.day.length; d++) {
+        while (j + 1 < m.length && m[j + 1].day <= d) j++;
+        out.push(j >= 0 ? m[j].value : (m[0]?.value ?? s.measurement.fosTac));
+      }
+      return out;
+    },
+  };
+}
+
+export interface TimelineOptions {
+  /** während des Durchlaufs: nur sichtbare Messwerte, keine verborgenen Größen */
+  live?: boolean;
+}
+
+export function buildTimeline(s: GameState, opts: TimelineOptions = {}): HTMLElement {
   const days = Math.max(2, s.history.day.length);
   const wrap = h('div', { class: 'timeline' });
   const tip = h('div', { class: 'chart-tip', role: 'status', hidden: true });
@@ -166,7 +196,8 @@ export function buildTimeline(s: GameState): HTMLElement {
   ), strip);
 
   // Einzeldiagramme
-  for (const def of SERIES) {
+  for (const def0 of SERIES) {
+    const def = opts.live ? liveSeries(def0) : def0;
     const vals = def.values(s);
     if (!vals.length) continue;
     const dots = def.dots?.(s) ?? [];
@@ -185,7 +216,7 @@ export function buildTimeline(s: GameState): HTMLElement {
     max = Math.max(max, ticks[ticks.length - 1]);
     const yOf = (v: number) => PAD_T + (1 - (v - min) / (max - min)) * (CHART_H - PAD_T - PAD_B);
 
-    const svgEl = el('svg', { viewBox: `0 0 ${W} ${CHART_H}`, class: 'chart', role: 'img', 'aria-label': `${def.title} über das Jahr` });
+    const svgEl = el('svg', { viewBox: `0 0 ${W} ${CHART_H}`, class: 'chart', role: 'img', 'aria-label': opts.live ? `${def.title} bisher` : `${def.title} über das Jahr` });
     if (def.band) {
       const x1 = xOf(def.band.from, days);
       const x2 = xOf(Math.min(def.band.to, days - 1), days);
@@ -248,9 +279,9 @@ export function buildTimeline(s: GameState): HTMLElement {
     if (def.dots) {
       head.append(h('span', { class: 'legend-item' }, h('span', { class: 'swatch swatch--line' }), def.lineLabel ?? ''), h('span', { class: 'legend-item' }, h('span', { class: 'swatch swatch--dot' }), def.dotsLabel ?? ''));
     }
-    wrap.append(h('div', { class: 'chart-wrap' }, head, svgEl));
+    wrap.append(h('div', { class: 'chart-wrap', 'data-series': def.id }, head, svgEl));
   }
-  wrap.append(tip, tableView(s));
+  wrap.append(tip, tableView(s, opts.live));
   return wrap;
 }
 
@@ -264,17 +295,18 @@ function legendShape(kind: 'decision' | 'warning' | 'critical' | 'chain'): SVGEl
 }
 
 /** Tabellenansicht: Werte am Monatsende. */
-function tableView(s: GameState): HTMLElement {
+function tableView(s: GameState, live = false): HTMLElement {
   const days = s.history.day.length;
+  const series = live ? SERIES.map(liveSeries) : SERIES;
   const rows: HTMLElement[] = [];
   for (let i = 0; i < days; i++) {
     const last = i === days - 1 || dateOfDay(i + 1).month !== dateOfDay(i).month;
     if (!last) continue;
-    rows.push(h('tr', {}, h('th', { scope: 'row' }, formatDate(i)), ...SERIES.map((d) => h('td', {}, d.format(d.values(s)[i])))));
+    rows.push(h('tr', {}, h('th', { scope: 'row' }, formatDate(i)), ...series.map((d) => h('td', {}, d.format(d.values(s)[i])))));
   }
   return h('details', { class: 'table-view' },
     h('summary', {}, 'Als Tabelle'),
     h('div', { class: 'table-scroll' },
-      h('table', {}, h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Tag'), ...SERIES.map((d) => h('th', { scope: 'col' }, d.title)))), h('tbody', {}, ...rows))),
+      h('table', {}, h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Tag'), ...series.map((d) => h('th', { scope: 'col' }, d.title)))), h('tbody', {}, ...rows))),
   );
 }

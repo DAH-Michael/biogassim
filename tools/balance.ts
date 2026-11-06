@@ -15,13 +15,14 @@ const arg = (n: string, d: string) => { const i = args.indexOf(`--${n}`); return
 const seeds = Number(arg('seeds', '40'));
 const scenario = arg('scenario', 'altanlage') as ScenarioOptions['id'];
 const only = arg('strategies', '');
+const level = arg('difficulty', 'normal') as NonNullable<ScenarioOptions['difficulty']>;
 const names = only ? only.split(',') : Object.keys(STRATEGIES);
 
 const eur = (v: number) => `${Math.round(v / 1000).toLocaleString('de-DE')} T€`;
 const pct = (v: number) => `${Math.round(v * 100)} %`;
 const median = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
 
-console.log(`Szenario ${scenario}, ${seeds} Seeds je Strategie\n`);
+console.log(`Szenario ${scenario}, Schwierigkeit ${level}, ${seeds} Seeds je Strategie\n`);
 console.log('| Strategie | Jahr geschafft | Scheitern (Art: Anzahl) | typischer Zeitpunkt | Gewinn bei Erfolg (Mittel) | Stufen bei Erfolg | Akzeptanz Ø | Gasverluste Ø |');
 console.log('|---|---|---|---|---|---|---|---|');
 for (const name of names) {
@@ -32,7 +33,7 @@ for (const name of names) {
   let acc = 0;
   let loss = 0;
   for (let s = 1; s <= seeds; s++) {
-    const g = runToEnd(createGame(s, { id: scenario }), STRATEGIES[name].strategy);
+    const g = runToEnd(createGame(s, { id: scenario, difficulty: level }), STRATEGIES[name].strategy);
     const y = yearSummary(g);
     acc += y.acceptanceAvg;
     loss += y.gasLossShare;

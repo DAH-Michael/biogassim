@@ -11,6 +11,7 @@ import { acceptanceDay } from './acceptance';
 import { financeDay, settleMonth, villageHeatDemandKwh } from './finance';
 import { measurementDay } from './measurement';
 import { checkFailure } from './failure';
+import { difficulty } from './difficulty';
 import { say } from './messages';
 import type { Action, GameState } from './types';
 
@@ -27,7 +28,7 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
   const weather = state.weather.days[day];
   const playerChangedToday = state.feedChangedDay === day;
   state.residueDeliveredToday = undefined;
-  state.today = { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0 };
+  state.today = { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0, offtakeM3: 0, siloSoldT: 0 };
 
   // Ausbauten fertig
   for (const b of state.builds.filter((x) => x.doneDay === day)) {
@@ -67,6 +68,9 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
     heatShare: state.chp.runShare,
     ambientC: weather.tempC,
     traceDosing: state.rampFeed !== null,
+    shiftStressFactor: difficulty(state).shiftStressFactor,
+    growthFactor: difficulty(state).growthFactor,
+    traceElementsActive: difficulty(state).traceElements,
   }, feed.changeCause, feed.residueEvent);
 
   // Gärrestlager (aufgefangenes Restgas geht in den Gasspeicher)
@@ -77,7 +81,8 @@ export function stepDay(state: GameState, actions: Action[] = []): ActionResult[
 
   // Gas und BHKW
   const tech = techDay(state, ch4);
-  state.today.spreadM3 = state.digestate.spreadToday;
+  state.today.spreadM3 = state.digestate.spreadToday - state.digestate.offtakeToday;
+  state.today.offtakeM3 = state.digestate.offtakeToday;
 
   // Akzeptanz
   const heatOutage = state.heatLineActive && state.chp.status !== 'betrieb' && villageHeatDemandKwh(state) / CONFIG.units.hoursPerDay > CONFIG.finance.heatOutageNoticeKw;

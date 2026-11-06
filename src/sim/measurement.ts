@@ -1,6 +1,7 @@
 import { CONFIG } from './config';
 import { gaussian } from './rng';
 import { hasStaff, ledger } from './storage';
+import { difficulty } from './difficulty';
 import type { GameState } from './types';
 
 /**
@@ -10,8 +11,10 @@ import type { GameState } from './types';
 export function measurementLevel(state: GameState) {
   const M = CONFIG.biology.measurement;
   if (state.unlocks.includes('labor')) return M.lab;
+  const lvl = difficulty(state).measurement;
+  if (lvl === 'lab') return M.lab;
   if (hasStaff(state, 'biologin')) return M.biologist;
-  return M.external;
+  return lvl === 'slow' ? M.slow : M.external;
 }
 
 export function measurementDay(state: GameState): void {

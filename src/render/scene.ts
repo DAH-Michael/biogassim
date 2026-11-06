@@ -1,11 +1,15 @@
 import { CONFIG } from '../sim/config';
+import { hasFeature } from '../sim/difficulty';
 import { dateOfDay, inWindow } from '../sim/calendar';
 import type { FieldState, GameState } from '../sim/types';
 import { fitView, project, type View } from './iso';
 import { mix, rgb, shade, type Palette, type Rgb } from './palette';
 import { Draw } from './shapes';
-import { FIELDS, NEIGHBOR_FIELDS, NORTH_ROAD_X, ORIGINS, PLANT, ROAD_Y, VILLAGE, WORLD, type Pt } from './layout';
-import { planTrips, tripPosition, type Trip } from './vehicles';
+import { CONTRACT_FIELDS, FIELD_ROUTES, FIELDS, NEIGHBOR_FIELDS, NORTH_ROAD_X, ORIGINS, PLANT, ROAD_Y, VILLAGE, WORLD, type Pt } from './layout';
+import { contractField, planTrips, tripPosition, type Trip } from './vehicles';
+
+type Rect = { x: number; y: number; w: number; d: number };
+interface FieldView { standing: string; growth: number; harvested: number; own: boolean; harvesting: boolean; sowing: boolean }
 
 /**
  * Szene: zeichnet ausschließlich den aktuellen Zustand und interpoliert zwischen
@@ -39,6 +43,22 @@ function snap(s: GameState): Snap {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const smooth = (x: number) => x * x * (3 - 2 * x);
+/** Anteil des Tages, über den Wetter und Jahreszeit überblendet werden */
+const WEATHER_FADE = 0.6;
+const CLOUDS = 8;
+const CLOUD_PUFFS: [number, number, number][] = [[0, 0, 0.55], [0.6, -0.15, 0.7], [1.25, 0, 0.55], [0.6, 0.2, 0.6], [1.7, 0.15, 0.4]];
+
+/** Bewölkung eines Tages: bei Regen dicht, sonst locker und von Tag zu Tag verschieden. */
+function cloudiness(w: { rainMm: number; frost: boolean }, day: number): number {
+  if (w.rainMm > 0) return Math.min(1, 0.65 + w.rainMm / 25);
+  const hash = Math.abs(Math.sin((day + 1) * 12.9898) * 43758.5453) % 1;
+  return 0.05 + hash * 0.4;
+}
+
+export type HoverShape =
+  | { kind: 'circle'; cx: number; cy: number; r: number; h: number; label: string }
+  | { kind: 'rect'; x: number; y: number; w: number; d: number; h: number; label: string };
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 export class Scene {
@@ -53,11 +73,18 @@ export class Scene {
   private prev: Snap | null = null;
   private cur: Snap | null = null;
   private trips: Trip[] = [];
+  private hasBg = false;
   /** Statussymbole, die über allem gezeichnet werden */
   private overlays: (() => void)[] = [];
   /** Zwischenpuffer für Boden, Straßen und Felder: ändert sich nur einmal pro Spieltag */
   private bg: HTMLCanvasElement = document.createElement('canvas');
   private bgDirty = true;
+  /** Hintergrund des Vortags für den weichen Übergang von Wetter und Jahreszeit */
+  private bgPrev: HTMLCanvasElement = document.createElement('canvas');
+  private bgPrevValid = false;
+  private dayChanged = false;
+  /** hervorgehobenes Objekt unter dem Mauszeiger */
+  private hover: HoverShape | null = null;
 
   constructor(private canvas: HTMLCanvasElement, private pal: Palette) {
     const ctx = canvas.getContext('2d');
@@ -82,6 +109,9 @@ export class Scene {
     this.applyZoom();
     this.bg.width = this.canvas.width;
     this.bg.height = this.canvas.height;
+    this.bgPrev.width = this.canvas.width;
+    this.bgPrev.height = this.canvas.height;
+    this.bgPrevValid = false;
     this.bgDirty = true;
   }
 
@@ -102,6 +132,7 @@ export class Scene {
     this.panY = Math.max(-limY, Math.min(limY, this.panY));
     this.view = { scale: b.scale * this.zoom, ox: cx + (b.ox - cx) * this.zoom + this.panX, oy: cy + (b.oy - cy) * this.zoom + this.panY };
     this.bgDirty = true;
+    this.bgPrevValid = false;
   }
 
   /** Zoomen um einen Bildschirmpunkt (Standard: Mitte). */
@@ -154,6 +185,11 @@ export class Scene {
     this.cur = s;
     this.trips = planTrips(state);
     this.bgDirty = true;
+    this.dayChanged = true;
+  }
+
+  setHover(h: HoverShape | null): void {
+    this.hover = h;
   }
 
   /** Ein Bild. `f` ist der Fortschritt im laufenden Spieltag (0 bis 1), `t` die Echtzeit in Sekunden. */
@@ -176,26 +212,36 @@ export class Scene {
     const weather = st.weather.days[dayIdx];
 
     if (this.bgDirty) {
+      // Neuer Tag: alten Hintergrund aufheben und weich überblenden
+      if (this.dayChanged) {
+        const pctx = this.bgPrev.getContext('2d')!;
+        pctx.setTransform(1, 0, 0, 1, 0, 0);
+        pctx.clearRect(0, 0, this.bgPrev.width, this.bgPrev.height);
+        pctx.drawImage(this.bg, 0, 0);
+        this.bgPrevValid = this.bgPrevValid || this.hasBg;
+      }
+      this.dayChanged = false;
+      this.hasBg = true;
       const bctx = this.bg.getContext('2d')!;
       bctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       const bd = new Draw(bctx, this.view);
       this.drawSky(bctx, st, dayIdx);
       this.drawGround(bd, st, dayIdx);
       this.drawRoads(bd);
-      for (const [id, rect] of Object.entries(FIELDS)) {
-        const field = st.fields.find((x) => x.id === id);
-        if (field) this.drawField(bd, rect, field, st, dayIdx);
-      }
-      NEIGHBOR_FIELDS.forEach((r, i) => this.drawNeighborField(bd, r, st, dayIdx, i));
+      for (const [key, rect] of this.fieldRects()) this.drawFieldStatic(bd, rect, this.fieldView(key, st, dayIdx));
+      this.drawNeighborField(bd, NEIGHBOR_FIELDS[1], st, dayIdx);
       this.bgDirty = false;
     }
+    const fade = smooth(clamp01(k / WEATHER_FADE));
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.drawImage(this.bg, 0, 0);
+    if (this.bgPrevValid && fade < 1) {
+      c.drawImage(this.bgPrev, 0, 0);
+      c.globalAlpha = fade;
+      c.drawImage(this.bg, 0, 0);
+      c.globalAlpha = 1;
+    } else c.drawImage(this.bg, 0, 0);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    for (const [id, rect] of Object.entries(FIELDS)) {
-      const field = st.fields.find((x) => x.id === id);
-      if (field) this.drawFieldWork(d, rect, field, st, t);
-    }
+    for (const [key, rect] of this.fieldRects()) this.drawFieldWork(d, rect, this.fieldView(key, st, dayIdx), t);
     this.drawHeatLine(d, st, t);
 
     // Objekte von hinten nach vorne
@@ -212,7 +258,7 @@ export class Scene {
     if (st.built.digestateStorage) items.push({ depth: P.storage2.cx + P.storage2.cy, draw: () => this.drawStorage(d, st, s, t, P.storage2) });
     items.push({ depth: P.pit.cx + P.pit.cy, draw: () => this.drawPit(d, st) });
     items.push({ depth: P.chp.x + P.chp.w + P.chp.y + P.chp.d, draw: () => this.drawChp(d, st, t) });
-    items.push({ depth: P.desulf.cx + P.desulf.cy, draw: () => this.drawDesulf(d, s) });
+    if (hasFeature(st, 'entschwefelung')) items.push({ depth: P.desulf.cx + P.desulf.cy, draw: () => this.drawDesulf(d, s) });
     if (st.built.gasStorage) items.push({ depth: P.gasStorage2.cx + P.gasStorage2.cy, draw: () => this.drawGasStorage2(d, s) });
     items.push({ depth: P.flare.x + P.flare.y, draw: () => this.drawFlare(d, st, t) });
     VILLAGE.houses.forEach(([x, y], i) => items.push({ depth: x + y + 2, draw: () => this.drawHouse(d, x, y, i, st, t) }));
@@ -223,9 +269,16 @@ export class Scene {
     items.sort((a, b) => a.depth - b.depth);
     this.overlays = [];
     for (const it of items) it.draw();
-    for (const o of this.overlays) o();
 
-    this.drawWeather(c, weather, t);
+    const prevW = st.weather.days[Math.max(0, dayIdx - 1)];
+    const rainMm = this.bgPrevValid ? lerp(prevW.rainMm, weather.rainMm, fade) : weather.rainMm;
+    const clouds = lerp(cloudiness(prevW, dayIdx - 1), cloudiness(weather, dayIdx), this.bgPrevValid ? fade : 1);
+    this.drawClouds(c, clouds, rainMm > 0.5, t);
+    this.drawWeather(c, { rainMm, frost: weather.frost }, t);
+    // Statussymbole bleiben über Wolken und Regen sichtbar
+    for (const o of this.overlays) o();
+    if (this.hover) this.drawHover(d, this.hover);
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
   // ---------- Himmel, Boden, Jahreszeit, Wetter ----------
@@ -281,10 +334,10 @@ export class Scene {
     };
     seg([0, ROAD_Y], [WORLD.w, ROAD_Y]);
     seg([NORTH_ROAD_X, 0], [NORTH_ROAD_X, ROAD_Y]);
-    for (const o of Object.values(ORIGINS)) {
-      for (let i = 1; i < o.route.length; i++) {
-        const a = o.route[i - 1];
-        const b = o.route[i];
+    for (const route of [...Object.values(ORIGINS).map((o) => o.route), FIELD_ROUTES.n0.slice(1)]) {
+      for (let i = 1; i < route.length; i++) {
+        const a = route[i - 1];
+        const b = route[i];
         if (a[0] === b[0] || a[1] === b[1]) seg(a, b);
       }
     }
@@ -320,55 +373,86 @@ export class Scene {
     return drought && crop !== 'leer' ? mix(c, p['gelb-50'], 0.35) : c;
   }
 
-  private drawField(d: Draw, r: { x: number; y: number; w: number; d: number }, field: FieldState, st: GameState, day: number): void {
-    const p = this.pal;
-    const drought = st.weather.drought;
-    const cfg = CONFIG.fields.list.find((x) => x.id === field.id)!;
-    // Verpachtete Felder des Nachbarn: Mais bis zu dessen Ernte, danach Stoppel
-    let standing: string = field.standing;
-    let growth = field.growth;
-    if (field.status === 'verpachtet') {
-      const harvested = !inWindow(day, { from: [8, 1], to: [9, 20] });
-      standing = harvested ? 'stoppel' : 'mais';
-      growth = harvested ? 0 : 0.95;
+  private fieldRects(): [string, Rect][] {
+    return [...Object.entries(FIELDS), ['n0', NEIGHBOR_FIELDS[0]]];
+  }
+
+  /**
+   * Was auf einem Feld zu sehen ist. Eigene Felder folgen der Simulation; Felder der
+   * Vertragslandwirte zeigen den Erntefortschritt nach den tatsächlichen Lieferungen.
+   */
+  private fieldView(key: string, st: GameState, day: number): FieldView {
+    const date = dateOfDay(day);
+    const m = date.month;
+    const delivering = st.today.deliveries.some((d) => contractField(st, d.origin) === key);
+    const progress = (kind: 'mais' | 'gruenroggen') => {
+      const cs = st.contracts.filter((c) => c.kind === kind && CONTRACT_FIELDS[c.offerId] === key);
+      const tonnes = cs.reduce((a, c) => a + c.tonnes, 0);
+      return tonnes > 0 ? cs.reduce((a, c) => a + c.delivered, 0) / tonnes : null;
+    };
+    const field = st.fields.find((x) => x.id === key);
+    if (field && field.status !== 'verpachtet') {
+      const cfg = CONFIG.fields.list.find((x) => x.id === key)!;
+      return {
+        standing: field.standing, growth: field.growth, harvested: field.harvestedHa / cfg.ha, own: field.status === 'gefuehrt',
+        harvesting: st.today.harvesting.includes(key), sowing: st.today.sowing.includes(key),
+      };
     }
-    const harvestedShare = field.harvestedHa / cfg.ha;
-    const split = r.x + r.w * harvestedShare;
+    // Felder der Landwirte: Mais im Sommer, bei Hof Brandt Grünroggen im Winter (Zweikultur)
+    const tenantMaizeDone = inWindow(day, { from: [9, 21], to: [9, 30] }) || (m >= 10 && m <= 12);
+    if (key === 'n0' && (m >= 10 || m <= 5)) {
+      if (m === 10 && date.dayOfMonth < 15) return { standing: 'stoppel', growth: 0, harvested: 0, own: false, harvesting: false, sowing: false };
+      const share = progress('gruenroggen');
+      const growth = m >= 10 ? 0.1 : m <= 3 ? 0.2 + m * 0.05 : Math.min(1, 0.4 + (m - 3) * 0.3);
+      const dateDone = m === 5 && date.dayOfMonth > 20;
+      if (share === 1 || (share === null && dateDone)) return { standing: 'leer', growth: 0, harvested: 0, own: false, harvesting: false, sowing: false };
+      return { standing: 'gruenroggen', growth, harvested: share ?? 0, own: false, harvesting: delivering, sowing: false };
+    }
+    const share = progress('mais');
+    const growth = m === 6 ? 0.3 : m === 7 ? 0.6 : m === 8 ? 0.9 : 0.97;
+    if (share === 1 || (share === null && tenantMaizeDone) || (m >= 1 && m <= 5 && key !== 'n0')) {
+      return { standing: m >= 1 && m <= 5 ? 'leer' : 'stoppel', growth: 0, harvested: 0, own: false, harvesting: false, sowing: false };
+    }
+    return { standing: 'mais', growth, harvested: share ?? 0, own: false, harvesting: delivering, sowing: false };
+  }
+
+  private drawFieldStatic(d: Draw, r: Rect, v: FieldView): void {
+    const p = this.pal;
+    const drought = this.state?.weather.drought ?? false;
+    const split = r.x + r.w * v.harvested;
     // Abgeerntet (Stoppel) links, stehend rechts
-    if (harvestedShare > 0) this.fieldPatch(d, r.x, r.y, split - r.x, r.d, 'stoppel', 0, drought);
-    this.fieldPatch(d, split, r.y, r.x + r.w - split, r.d, standing, growth, drought);
-    // Rahmen: eigene Felder dunkelgrün, verpachtete grau gestrichelt
-    const own = field.status === 'gefuehrt';
-    d.poly([[r.x, r.y, 0], [r.x + r.w, r.y, 0], [r.x + r.w, r.y + r.d, 0], [r.x, r.y + r.d, 0]], null, own ? p.dunkelgruen : p.k40, own ? 2 : 1);
+    if (v.harvested > 0) this.fieldPatch(d, r.x, r.y, split - r.x, r.d, 'stoppel', 0, drought);
+    this.fieldPatch(d, split, r.y, r.x + r.w - split, r.d, v.standing, v.growth, drought);
+    // Rahmen: eigene Felder dunkelgrün, fremde grau
+    d.poly([[r.x, r.y, 0], [r.x + r.w, r.y, 0], [r.x + r.w, r.y + r.d, 0], [r.x, r.y + r.d, 0]], null, v.own ? p.dunkelgruen : p.k40, v.own ? 2 : 1);
     // Markierung: Fahne für eigene Felder, Pfosten für fremde
     const [fx, fy] = [r.x + 0.6, r.y + 0.6];
     d.line([fx, fy, 0], [fx, fy, 1.6], p.k60, Math.max(1, this.view.scale * 0.08));
-    if (own) d.poly([[fx, fy, 1.6], [fx + 1.1, fy, 1.35], [fx, fy, 1.1]], p.dunkelgruen);
+    if (v.own) d.poly([[fx, fy, 1.6], [fx + 1.1, fy, 1.35], [fx, fy, 1.1]], p.dunkelgruen);
   }
 
-  private drawFieldWork(d: Draw, r: { x: number; y: number; w: number; d: number }, field: FieldState, st: GameState, t: number): void {
+  /** Feldarbeit: Häcksler mit Abfahrer bei der Ernte, Drillmaschine bei der Saat. */
+  private drawFieldWork(d: Draw, r: Rect, v: FieldView, t: number): void {
+    if (!v.harvesting && !v.sowing) return;
     const p = this.pal;
-    const cfg = CONFIG.fields.list.find((x) => x.id === field.id)!;
-    const split = r.x + r.w * (field.harvestedHa / cfg.ha);
-    // Feldarbeit: Häcksler und Abfahrer während der Ernte, Drillmaschine bei der Saat
-    const harvesting = st.today.harvesting.includes(field.id);
-    const sowing = st.today.sowing.includes(field.id);
-    if (harvesting || sowing) {
-      const lanes = 5;
-      const phase = (t * 0.25) % 1;
-      const laneIdx = Math.floor(phase * lanes);
-      const along = (phase * lanes) % 1;
-      const yy = r.y + (laneIdx + 0.5) * (r.d / lanes);
-      const x0 = harvesting ? split : r.x;
-      const xx = x0 + 0.5 + (laneIdx % 2 === 0 ? along : 1 - along) * Math.max(0.5, (harvesting ? r.x + r.w - split : r.w) - 1);
-      if (harvesting) {
-        this.machine(d, xx, yy, p.hellgruen, 1.6, 1.1, 1.2);
-        this.machine(d, xx, yy + 1.3, p.dunkelgruen, 1.0, 0.8, 0.9);
-        d.box(xx - 1.8, yy + 1.0, 1.4, 0.9, 0.7, p.k20);
-      } else {
-        this.machine(d, xx, yy, p.dunkelgruen, 1.0, 0.8, 0.9);
-        d.box(xx - 1.5, yy - 0.6, 0.6, 1.8, 0.4, p.k60);
-      }
+    const split = r.x + r.w * v.harvested;
+    const lanes = 5;
+    const phase = (t * 0.25) % 1;
+    const laneIdx = Math.floor(phase * lanes);
+    const along = (phase * lanes) % 1;
+    const yy = r.y + (laneIdx + 0.5) * (r.d / lanes);
+    const x0 = v.harvesting ? split : r.x;
+    const span = Math.max(0.5, (v.harvesting ? r.x + r.w - split : r.w) - 1);
+    const xx = x0 + 0.5 + (laneIdx % 2 === 0 ? along : 1 - along) * span;
+    if (v.harvesting) {
+      // Häcksler, daneben Traktor mit Anhänger, in den gehäckselt wird
+      this.machine(d, xx, yy, p.hellgruen, 1.6, 1.1, 1.2);
+      d.box(xx - 0.9, yy + 0.9, 1.6, 0.9, 0.7, p.silage);
+      this.machine(d, xx + 1.2, yy + 1.35, p.dunkelgruen, 0.9, 0.8, 0.9);
+      for (let i = 0; i < 3; i++) d.puff(xx - 0.2 + i * 0.1, yy + 0.5 + i * 0.15, 1.3 + i * 0.2, 0.12 + i * 0.05, p.silage, 0.7 - i * 0.2);
+    } else {
+      this.machine(d, xx, yy, p.dunkelgruen, 1.0, 0.8, 0.9);
+      d.box(xx - 1.5, yy - 0.6, 0.6, 1.8, 0.4, p.k60);
     }
   }
 
@@ -392,10 +476,10 @@ export class Scene {
     }
   }
 
-  private drawNeighborField(d: Draw, r: { x: number; y: number; w: number; d: number }, st: GameState, day: number, i: number): void {
+  private drawNeighborField(d: Draw, r: Rect, st: GameState, day: number): void {
     const m = dateOfDay(day).month;
-    // Nachbarflächen der Gärrest-Abnehmer: Wintergetreide, im Juli geerntet, danach Stoppel bis zur Herbstsaat
-    const crop = m === 8 || (m === 9 && i === 1) ? 'stoppel' : 'gruenroggen';
+    // Getreidefläche eines Gärrest-Abnehmers: Wintergetreide, im Juli geerntet, danach Stoppel bis zur Herbstsaat
+    const crop = m === 8 || m === 9 ? 'stoppel' : 'gruenroggen';
     const growth = m >= 9 ? 0.12 : m <= 3 ? 0.25 : Math.min(1, (m - 3) / 4);
     this.fieldPatch(d, r.x, r.y, r.w, r.d, crop, growth, st.weather.drought);
     d.poly([[r.x, r.y, 0], [r.x + r.w, r.y, 0], [r.x + r.w, r.y + r.d, 0], [r.x, r.y + r.d, 0]], null, this.pal.k40, 1);
@@ -408,45 +492,44 @@ export class Scene {
     const S = PLANT.silo;
     const half = S.w / 2;
     const cap = CONFIG.plant.siloCapacityT / 2;
-    // Bodenplatte und Rückwand
-    d.rect(S.x, S.y, S.w, S.d, 0, p.concrete, p.k40);
-    d.box(S.x, S.y - 0.3, S.w, 0.3, S.wall, p.concrete);
-    // zwei Kammern: Mais links, Grünroggen rechts
-    const piles: [number, number, Rgb, number][] = [
-      [S.x, s.maisT, p.silage, st.silo.mais.quality],
-      [S.x + half, s.ryeT, p.silageRye, st.silo.gruenroggen.quality],
-    ];
-    for (const [x, tonnes, color, quality] of piles) {
+    // Stapelhöhe bleibt unter der Wandkrone, damit nichts durch die Wände ragt
+    const pileH = (fill: number) => 0.15 + fill * (S.wall - 0.3);
+    const activeKind = st.silo.deliveredToday > 0 ? (st.today.deliveries.some((x) => x.kind === 'gruenroggen') ? 1 : 0) : -1;
+
+    const drawChamber = (k: number, x: number, tonnes: number, color: Rgb, quality: number) => {
       const fill = clamp01(tonnes / cap);
-      if (fill <= 0.002) continue;
-      const h = 0.25 + fill * 2.4;
-      const depth = S.d * (0.35 + 0.65 * fill);
-      // Folie oben, Anschnitt vorne zeigt die Silage
-      d.box(x + 0.2, S.y, half - 0.4, depth, h, color, 0, p.foil);
-      // Reifen auf der Folie
-      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) d.disc(x + 0.9 + i * 1.3, S.y + 0.8 + j * (depth - 1.6), 0.18, h + 0.01, p.k100);
-      // Schimmel und Nacherwärmung bei schlechter Qualität: helle Flecken am Anschnitt
-      const spots = Math.round(clamp01((CONFIG.acceptance.silageGoodQuality - quality) * 6) * 8);
-      for (let i = 0; i < spots; i++) {
-        const sx = x + 0.5 + ((i * 0.83) % (half - 1.2));
-        const sz = 0.2 + ((i * 0.37) % 1) * (h - 0.4);
-        d.disc(sx, S.y + depth + 0.01, 0.16, sz, p.white, p.k60);
+      const h = pileH(fill);
+      if (fill > 0.002) {
+        // Befüllt von der Rückwand her, Anschnitt vorne zeigt die Silage, oben Folie
+        const depth = S.d * (0.3 + 0.7 * fill);
+        d.box(x + 0.2, S.y, half - 0.4, depth, h, color, 0, p.foil);
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) d.disc(x + 0.9 + i * 1.3, S.y + 0.6 + j * Math.max(0.4, depth - 1.2), 0.16, h + 0.01, p.k100);
+        // Schimmel und Nacherwärmung bei schlechter Qualität: helle Flecken am Anschnitt
+        const spots = Math.round(clamp01((CONFIG.acceptance.silageGoodQuality - quality) * 6) * 8);
+        for (let i = 0; i < spots; i++) {
+          const sx = x + 0.5 + ((i * 0.83) % (half - 1.2));
+          const sz = 0.1 + ((i * 0.37) % 1) * Math.max(0.1, h - 0.25);
+          d.disc(sx, S.y + depth + 0.01, 0.14, sz, p.white, p.k60);
+        }
       }
-    }
-    // Seitenwände
-    d.box(S.x - 0.3, S.y - 0.3, 0.3, S.d + 0.3, S.wall, p.concrete);
+      // Walzschlepper verdichtet, solange angeliefert wird
+      if (activeKind === k) {
+        const along = (Math.sin(t * 1.4) + 1) / 2;
+        const mx = x + 0.9 + along * (half - 2.0);
+        this.machine(d, mx, S.y + 1.4, p.dunkelgruen, 1.2, 0.9, 0.9, h);
+        for (let i = 0; i < 3; i++) d.puff(mx - 0.4 - i * 0.4, S.y + 2.2, h + 0.4 + i * 0.25, 0.22 + i * 0.1, p['gelb-30'], 0.5 - i * 0.12);
+      }
+    };
+
+    // Zeichenreihenfolge von hinten nach vorne: Boden, Rückwand, linke Wand, linke Kammer,
+    // Mittelwand, rechte Kammer, rechte Wand
+    d.rect(S.x, S.y, S.w, S.d, 0, p.concrete, p.k40);
+    d.box(S.x - 0.3, S.y - 0.3, S.w + 0.6, 0.3, S.wall, p.concrete);
+    d.box(S.x - 0.3, S.y, 0.3, S.d, S.wall, p.concrete);
+    drawChamber(0, S.x, s.maisT, p.silage, st.silo.mais.quality);
     d.box(S.x + half - 0.15, S.y, 0.3, S.d, S.wall, p.concrete);
-    d.box(S.x + S.w, S.y - 0.3, 0.3, S.d + 0.3, S.wall, p.concrete);
-    // Walzschlepper verdichtet, solange angeliefert wird
-    if (st.silo.deliveredToday > 0) {
-      const kind = st.today.deliveries.some((x) => x.kind === 'gruenroggen') ? 1 : 0;
-      const tonnes = kind ? s.ryeT : s.maisT;
-      const h = 0.25 + clamp01(tonnes / cap) * 2.4;
-      const along = (Math.sin(t * 1.4) + 1) / 2;
-      const x = S.x + kind * half + 0.6 + along * (half - 2.2);
-      this.machine(d, x, S.y + 1.6, p.dunkelgruen, 1.3, 1.0, 1.0, h);
-      for (let i = 0; i < 3; i++) d.puff(x - 0.4 - i * 0.4, S.y + 2.4, h + 0.4 + i * 0.25, 0.25 + i * 0.1, p['gelb-30'], 0.5 - i * 0.12);
-    }
+    drawChamber(1, S.x + half, s.ryeT, p.silageRye, st.silo.gruenroggen.quality);
+    d.box(S.x + S.w, S.y, 0.3, S.d, S.wall, p.concrete);
   }
 
   private drawSilo2(d: Draw): void {
@@ -596,7 +679,8 @@ export class Scene {
       const strength = clamp01(st.gas.flaredToday / 2000);
       const [sx, sy] = project(this.view, F.x, F.y, F.h);
       const c = this.ctx;
-      const sc = this.view.scale * (1.0 + strength * 1.2);
+      // Flamme klein halten: sichtbar, aber im Maßstab der Anlage
+      const sc = this.view.scale * (0.28 + strength * 0.22);
       const layers: [Rgb, number][] = [[p.danger, 1.6], [p.warning, 1.2], [p.gelb, 0.75]];
       for (const [col, size] of layers) {
         const flick = 1 + 0.15 * Math.sin(t * 17 + size * 3) + 0.1 * Math.sin(t * 29);
@@ -666,10 +750,11 @@ export class Scene {
     const cab = trip.kind === 'traktor' || trip.kind === 'guellefass' ? p.dunkelgruen : p.white;
     let load: Rgb = p.k20;
     if (trip.kind === 'lkw_silage' || trip.kind === 'traktor') load = trip.kind === 'traktor' ? p.silage : p.silage;
-    if (trip.kind === 'lkw_guelle' || trip.kind === 'guellefass') load = p.slurry;
+    if (trip.kind === 'lkw_guelle') load = p.slurry;
+    if (trip.kind === 'guellefass' || trip.kind === 'lkw_gaerrest') load = p.digestate;
     if (trip.kind === 'lkw_rest') load = p['gelb-50'];
     // Aufbau: Mulde oder Tank; beladen voll gefüllt
-    const bodyH = trip.kind === 'lkw_guelle' || trip.kind === 'guellefass' ? 0.8 : 0.6;
+    const bodyH = trip.kind === 'lkw_guelle' || trip.kind === 'guellefass' || trip.kind === 'lkw_gaerrest' ? 0.8 : 0.6;
     d.box(x, y, w, dd, 0.25, p.k60);
     if (along) {
       d.box(x, y, w * 0.72, dd, bodyH, pos.loaded ? load : p.k20, 0.25);
@@ -690,6 +775,102 @@ export class Scene {
   }
 
   // ---------- Wetter ----------
+
+  /** Ziehende Wolken mit Schatten auf dem Boden; Anzahl nach Bewölkung, grau bei Regen. */
+  private drawClouds(c: CanvasRenderingContext2D, amount: number, rainy: boolean, t: number): void {
+    const n = CLOUDS;
+    const W = this.width;
+    const H = this.height;
+    const col = rainy ? this.pal.k20 : this.pal.white;
+    for (let i = 0; i < n; i++) {
+      const a = clamp01(amount * n - i);
+      if (a <= 0) continue;
+      const speed = 0.006 * (1 + (i % 3) * 0.35);
+      const x = (((i * 0.37 + t * speed) % 1.4) - 0.2) * W;
+      const y = (0.06 + ((i * 0.29) % 0.55)) * H;
+      const size = Math.min(W, H) * (0.07 + (i % 4) * 0.015);
+      // Schatten auf dem Boden
+      c.fillStyle = rgb(this.pal.ink, 0.07 * a);
+      c.beginPath();
+      c.ellipse(x + size * 0.6, y + H * 0.22, size * 1.5, size * 0.55, 0, 0, Math.PI * 2);
+      c.fill();
+      // Wolke aus überlappenden Kreisen
+      c.fillStyle = rgb(col, (rainy ? 0.75 : 0.6) * a);
+      c.beginPath();
+      for (const [dx, dy, rr] of CLOUD_PUFFS) {
+        c.moveTo(x + dx * size + rr * size, y + dy * size);
+        c.arc(x + dx * size, y + dy * size, rr * size, 0, Math.PI * 2);
+      }
+      c.fill();
+    }
+  }
+
+  /** Umriss und Beschriftung des Objekts unter dem Mauszeiger. */
+  private drawHover(d: Draw, hv: HoverShape): void {
+    const p = this.pal;
+    const c = this.ctx;
+    c.save();
+    const strokeAll = (color: Rgb, width: number, alpha: number) => {
+      c.strokeStyle = rgb(color, alpha);
+      c.lineWidth = width;
+      c.lineJoin = 'round';
+      if (hv.kind === 'circle') {
+        d.path(d.ellipsePoints(hv.cx, hv.cy, hv.r + 0.15, hv.h));
+        c.stroke();
+        d.path(d.ellipsePoints(hv.cx, hv.cy, hv.r + 0.15, 0.02, -Math.PI / 4, (Math.PI * 3) / 4));
+        c.stroke();
+        for (const ang of [-Math.PI / 4, (Math.PI * 3) / 4]) {
+          const x = hv.cx + (hv.r + 0.15) * Math.cos(ang);
+          const y = hv.cy + (hv.r + 0.15) * Math.sin(ang);
+          const [ax, ay] = project(this.view, x, y, 0.02);
+          const [bx, by] = project(this.view, x, y, hv.h);
+          c.beginPath();
+          c.moveTo(ax, ay);
+          c.lineTo(bx, by);
+          c.stroke();
+        }
+      } else {
+        const { x, y, w, d: dd, h } = hv;
+        const pts: [number, number, number][][] = [
+          [[x, y, h], [x + w, y, h], [x + w, y + dd, h], [x, y + dd, h], [x, y, h]],
+          [[x, y + dd, 0], [x + w, y + dd, 0], [x + w, y, 0]],
+          [[x, y + dd, 0], [x, y + dd, h]], [[x + w, y + dd, 0], [x + w, y + dd, h]], [[x + w, y, 0], [x + w, y, h]],
+        ];
+        for (const line of pts) {
+          c.beginPath();
+          line.forEach(([px, py, pz], i) => {
+            const [sx, sy] = project(this.view, px, py, pz);
+            if (i === 0) c.moveTo(sx, sy);
+            else c.lineTo(sx, sy);
+          });
+          c.stroke();
+        }
+      }
+    };
+    strokeAll(p.white, 6, 0.9);
+    strokeAll(p.dunkelgruen, 2.5, 1);
+    // Beschriftung über dem Objekt
+    const [lx, ly] = hv.kind === 'circle' ? project(this.view, hv.cx, hv.cy, hv.h + hv.r * 0.6 + 0.6) : project(this.view, hv.x + hv.w / 2, hv.y + hv.d / 2, hv.h + 1);
+    c.font = '600 13px Inter, system-ui, sans-serif';
+    const text = hv.label;
+    const tw = c.measureText(text).width;
+    const padX = 10;
+    const bw = tw + padX * 2;
+    const bh = 26;
+    const bx = Math.max(4, Math.min(this.width - bw - 4, lx - bw / 2));
+    const by = Math.max(4, ly - bh - 6);
+    c.fillStyle = rgb(p.white, 0.96);
+    c.strokeStyle = rgb(p.dunkelgruen);
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.roundRect(bx, by, bw, bh, 13);
+    c.fill();
+    c.stroke();
+    c.fillStyle = rgb(p.ink);
+    c.textBaseline = 'middle';
+    c.fillText(text, bx + padX, by + bh / 2 + 1);
+    c.restore();
+  }
 
   private drawWeather(c: CanvasRenderingContext2D, w: { rainMm: number; frost: boolean }, t: number): void {
     if (w.rainMm <= 0) return;

@@ -3,6 +3,7 @@ import { dayOfDate, inWindow, windowDays } from './calendar';
 import { addCause, decayCauses, logEvent, topCauses } from './eventlog';
 import { round } from './biology';
 import { say } from './messages';
+import { difficulty } from './difficulty';
 import type { GameState } from './types';
 
 /**
@@ -33,7 +34,7 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
   const delivered = deliveries.reduce((a, d) => a + d.t, 0);
   silo.deliveredToday = delivered;
   if (delivered > 0) {
-    const compaction = Math.min(1, S.compactionCapacityTPerDay / delivered);
+    const compaction = difficulty(state).siloCompaction ? Math.min(1, S.compactionCapacityTPerDay / delivered) : 1;
     silo.compactionToday = compaction;
     silo.compactingDays++;
     let space = Math.max(0, silo.capacityT - siloStock(state));
@@ -63,6 +64,7 @@ export function siloDay(state: GameState, deliveries: SiloDelivery[]): void {
       silo.poorCompactionEvent = ev.id;
     }
     if (overflowT > 0) {
+      state.today.siloSoldT += overflowT;
       state.finance.balance += overflowT * S.overflowSalePricePerT;
       state.finance.ledger.silageSold = (state.finance.ledger.silageSold ?? 0) + overflowT * S.overflowSalePricePerT;
       if (!silo.overflowEvent) {
@@ -151,8 +153,10 @@ export function digestateDay(state: GameState, digestateT: number, residualCh4: 
     }
   }
   // Abnahmeverträge (Freischaltung): Abgabe an Betriebe mit eigenem Lager, ganzjährig
+  dg.offtakeToday = 0;
   if (dg.offtake) {
     const amount = Math.min(D.offtake.m3PerDay, dg.m3);
+    dg.offtakeToday = amount;
     dg.m3 -= amount;
     dg.spreadToday += amount;
     dg.spreadTotal += amount;

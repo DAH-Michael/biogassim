@@ -1,5 +1,6 @@
 import { formatSaveCode } from '../meta/savecode';
 import { h } from './dom';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Anzeige des Speichercodes in Vierergruppen mit Kopierknopf.
@@ -13,6 +14,7 @@ export function saveCodeView(code: string): HTMLElement {
   const copy = h('button', {
     type: 'button',
     class: 'btn',
+    'data-tip': TIPS.copyCode,
     onclick: async () => {
       try {
         await navigator.clipboard.writeText(shown);

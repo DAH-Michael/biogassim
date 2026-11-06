@@ -2,15 +2,20 @@ import { CONFIG } from '../sim/config';
 import { dateOfDay, formatDate } from '../sim/calendar';
 import { buildAnalysis } from './analysis';
 import type { GameState } from '../sim/types';
-import { Scene } from '../render/scene';
+import { Scene, type HoverShape } from '../render/scene';
 import { unproject } from '../render/iso';
-import { FIELDS, PLANT, VILLAGE } from '../render/layout';
+import { FIELDS, NEIGHBOR_FIELDS, PLANT, VILLAGE } from '../render/layout';
 import { GameController } from './game';
 import { MetricsBar } from './metrics';
-import { PANELS, panelIcon, type PanelDef } from './panels';
+import { PANELS, panelIcon, panelPreview, type PanelDef } from './panels';
+import type { DifficultyId } from '../sim/difficulty';
 import { Ticker } from './ticker';
 import { h, svg } from './dom';
 import { ICONS } from './icons';
+import { Advisor } from './advisor';
+import { buildStats } from './stats';
+import logoUrl from '../assets/logos/dah-logo-horizontal-farbig.svg?url';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Oberfläche: Kopfzeile mit Kalender und Zeitsteuerung, Leiste mit Entscheidungsbereichen,
@@ -18,21 +23,30 @@ import { ICONS } from './icons';
  */
 const SEASONS: Record<number, string> = { 12: 'Winter', 1: 'Winter', 2: 'Winter', 3: 'Frühjahr', 4: 'Frühjahr', 5: 'Frühjahr', 6: 'Sommer', 7: 'Sommer', 8: 'Sommer', 9: 'Herbst', 10: 'Herbst', 11: 'Herbst' };
 
-/** Antippbare Bereiche der Szene (Weltkoordinaten) und der zugehörige Entscheidungsbereich. */
-interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean }
-const inCircle = (cx: number, cy: number, r: number) => (x: number, y: number) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
-const inRect = (rx: number, ry: number, w: number, d: number) => (x: number, y: number) => x >= rx && x <= rx + w && y >= ry && y <= ry + d;
+/** Antippbare Bereiche der Szene (Weltkoordinaten), der zugehörige Entscheidungsbereich und die Hervorhebung. */
+interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean; shape: HoverShape }
+const circle = (panel: string, name: string, cx: number, cy: number, r: number, h: number, pad = 0): Hit => ({
+  panel, label: name, test: (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= (r + pad) ** 2, shape: { kind: 'circle', cx, cy, r, h, label: name },
+});
+const rect = (panel: string, name: string, rx: number, ry: number, w: number, d: number, h: number): Hit => ({
+  panel, label: name, test: (x, y) => x >= rx && x <= rx + w && y >= ry && y <= ry + d, shape: { kind: 'rect', x: rx, y: ry, w, d, h, label: name },
+});
+const P = PLANT;
 const HITS: Hit[] = [
-  { panel: 'feed', label: 'Fermenter', test: inCircle(PLANT.fermenter.cx, PLANT.fermenter.cy, PLANT.fermenter.r) },
-  { panel: 'feed', label: 'Nachgärer', test: inCircle(PLANT.post.cx, PLANT.post.cy, PLANT.post.r) },
-  { panel: 'feed', label: 'Eintrag', test: inRect(PLANT.feeder.x, PLANT.feeder.y, PLANT.feeder.w, PLANT.feeder.d) },
-  { panel: 'supply', label: 'Fahrsilo', test: inRect(PLANT.silo.x, PLANT.silo.y, PLANT.silo.w, PLANT.silo.d) },
-  { panel: 'tech', label: 'BHKW', test: inRect(PLANT.chp.x - 0.5, PLANT.chp.y - 0.5, PLANT.chp.w + 1, PLANT.chp.d + 1) },
-  { panel: 'tech', label: 'Entschwefelung', test: inCircle(PLANT.desulf.cx, PLANT.desulf.cy, PLANT.desulf.r + 0.4) },
-  { panel: 'tech', label: 'Notfackel', test: inCircle(PLANT.flare.x, PLANT.flare.y, 0.9) },
-  { panel: 'dig', label: 'Gärrestlager', test: inCircle(PLANT.storage.cx, PLANT.storage.cy, PLANT.storage.r) },
-  ...Object.entries(FIELDS).map(([, f]) => ({ panel: 'fields', label: 'Feld', test: inRect(f.x, f.y, f.w, f.d) })),
-  ...VILLAGE.houses.map(([x, y]) => ({ panel: 'build', label: 'Dorf', test: inRect(x - 0.3, y - 0.3, 2.4, 2.2) })),
+  circle('feed', 'Fermenter, öffnet Fütterung', P.fermenter.cx, P.fermenter.cy, P.fermenter.r, P.fermenter.h),
+  circle('feed', 'Nachgärer mit Gasspeicher, öffnet Fütterung', P.post.cx, P.post.cy, P.post.r, P.post.h + P.post.r * 0.6),
+  rect('feed', 'Feststoffeintrag, öffnet Fütterung', P.feeder.x, P.feeder.y, P.feeder.w, P.feeder.d, P.feeder.h),
+  circle('feed', 'Vorgrube für Gülle, öffnet Fütterung', P.pit.cx, P.pit.cy, P.pit.r, 0.5, 0.3),
+  rect('supply', 'Fahrsilo, öffnet Beschaffung', P.silo.x - 0.3, P.silo.y - 0.3, P.silo.w + 0.6, P.silo.d + 0.3, P.silo.wall),
+  rect('tech', 'BHKW, öffnet Technik', P.chp.x, P.chp.y, P.chp.w, P.chp.d, P.chp.h),
+  circle('tech', 'Entschwefelung, öffnet Technik', P.desulf.cx, P.desulf.cy, P.desulf.r, P.desulf.h, 0.4),
+  circle('tech', 'Notfackel, öffnet Technik', P.flare.x, P.flare.y, 0.5, P.flare.h, 0.4),
+  circle('dig', 'Gärrestlager, öffnet Gärrest', P.storage.cx, P.storage.cy, P.storage.r, P.storage.h),
+  ...Object.entries(FIELDS).map(([, f]) => rect('fields', 'Feld, öffnet Felder', f.x, f.y, f.w, f.d, 0)),
+  // Felder der Landwirte: Mais- und Grünroggenverträge, Gärrestabnahme
+  rect('supply', 'Feld von Hof Brandt, öffnet Beschaffung', NEIGHBOR_FIELDS[0].x, NEIGHBOR_FIELDS[0].y, NEIGHBOR_FIELDS[0].w, NEIGHBOR_FIELDS[0].d, 0),
+  rect('dig', 'Feld eines Gärrestabnehmers, öffnet Gärrest', NEIGHBOR_FIELDS[1].x, NEIGHBOR_FIELDS[1].y, NEIGHBOR_FIELDS[1].w, NEIGHBOR_FIELDS[1].d, 0),
+  ...VILLAGE.houses.map(([x, y]) => rect('build', 'Dorf, öffnet Ausbau und Dorf', x, y, 1.8, 1.6, 1.9)),
 ];
 /** Höhen, auf denen ein Klick getestet wird (für hohe Objekte). */
 const HIT_HEIGHTS = [3, 2, 1, 0];
@@ -43,7 +57,11 @@ const DRAG_THRESHOLD = 6;
 export class App {
   private game: GameController;
   private scene: Scene;
-  private metrics = new MetricsBar();
+  private metrics = new MetricsBar((id) => this.openStats(id));
+  private statsOverlay: HTMLElement;
+  /** Tempo vor dem Öffnen des Verlaufs */
+  private statsResume = 0;
+  private brandEl: HTMLElement;
   private ticker = new Ticker();
   private drawer: HTMLElement;
   private drawerTitle: HTMLElement;
@@ -56,36 +74,45 @@ export class App {
   private timeButtons: HTMLButtonElement[] = [];
   private endOverlay: HTMLElement;
   private canvas: HTMLCanvasElement;
+  private advisor: Advisor;
+  private stage!: HTMLElement;
 
   constructor(root: HTMLElement, game: GameController, private makeScene: (c: HTMLCanvasElement) => Scene, private restart: () => void, private toMenu: () => void = () => undefined) {
     this.game = game;
     this.dateEl = h('span', { class: 'calendar__date' });
     this.metaEl = h('span', { class: 'calendar__meta' });
-    const speeds: [number, keyof typeof ICONS, string][] = [[0, 'pause', 'Pause (Leertaste)'], [1, 'play', 'Normale Geschwindigkeit (1)'], [2, 'fast', 'Doppelte Geschwindigkeit (2)']];
+    const speeds: [number, keyof typeof ICONS, string, string][] = [
+      [0, 'pause', 'Pause', TIPS.pause],
+      [1, 'play', 'Normale Geschwindigkeit', TIPS.speed1],
+      [2, 'fast', 'Doppelte Geschwindigkeit', TIPS.speed2],
+      [4, 'faster', 'Vierfache Geschwindigkeit', TIPS.speed4],
+    ];
     const time = h('div', { class: 'time', role: 'group', 'aria-label': 'Zeit' });
-    for (const [v, icon, label] of speeds) {
-      const b = h('button', { type: 'button', class: 'time__btn', 'aria-label': label, title: label, onclick: () => this.game.setSpeed(v) }, svg(ICONS[icon])) as HTMLButtonElement;
+    for (const [v, icon, label, tip] of speeds) {
+      const b = h('button', { type: 'button', class: 'time__btn', 'aria-label': label, 'data-tip': tip, onclick: () => this.game.setSpeed(v) }, svg(ICONS[icon])) as HTMLButtonElement;
       b.dataset.speed = String(v);
       this.timeButtons.push(b);
       time.append(b);
     }
+    this.brandEl = h('div', { class: 'brand' }, 'Biogas-Anlage');
+    const statsBtn = h('button', { type: 'button', class: 'stats-btn', 'data-tip': TIPS.stats, onclick: () => this.openStats() }, svg(ICONS.chart), h('span', { class: 'stats-btn__label' }, 'Statistik'));
     const header = h('header', { class: 'topbar' },
-      h('div', { class: 'brand' }, 'Biogas-Anlage'),
+      this.brandEl,
       h('div', { class: 'calendar', 'aria-live': 'polite' }, this.dateEl, this.metaEl),
-      time,
+      h('div', { class: 'topbar__right' }, statsBtn, time),
     );
 
     this.rail = h('nav', { class: 'rail', 'aria-label': 'Entscheidungen' },
       ...PANELS.map((p) => h('button', {
         type: 'button', class: 'rail__btn', 'data-panel': p.id, 'aria-expanded': 'false', 'aria-controls': 'drawer',
-        title: `${p.title} (${p.key.toUpperCase()})`, onclick: () => this.toggle(p.id),
+        'data-tip': TIPS.rail[p.id], onclick: () => this.toggle(p.id),
       }, panelIcon(p.icon), h('span', { class: 'rail__label' }, p.title))),
     );
 
     this.drawerTitle = h('h2', { id: 'drawer-title', class: 'drawer__title' });
     this.drawerBody = h('div', { class: 'drawer__body' });
     this.drawer = h('section', { id: 'drawer', class: 'drawer', 'aria-labelledby': 'drawer-title', hidden: true },
-      h('div', { class: 'drawer__head' }, this.drawerTitle, h('button', { type: 'button', class: 'drawer__close', 'aria-label': 'Schließen (Esc)', onclick: () => this.close() }, svg(ICONS.close))),
+      h('div', { class: 'drawer__head' }, this.drawerTitle, h('button', { type: 'button', class: 'drawer__close', 'aria-label': 'Schließen', 'data-tip': TIPS.closePanel, onclick: () => this.close() }, svg(ICONS.close))),
       this.drawerBody,
     );
     this.drawerBody.addEventListener('pointerdown', (e) => {
@@ -100,7 +127,20 @@ export class App {
 
     this.canvas = h('canvas', { id: 'scene', 'aria-label': 'Ansicht der Biogasanlage mit Feldern und Dorf. Objekte lassen sich antippen.' }) as HTMLCanvasElement;
     this.endOverlay = h('div', { class: 'end', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'end-title' });
-    const stage = h('main', { class: 'stage' }, this.canvas, this.drawer, this.ticker.el, this.endOverlay);
+    this.statsOverlay = h('div', { class: 'end end--stats', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'stats-title' });
+    this.advisor = new Advisor({
+      getSpeed: () => this.game.speed,
+      setSpeed: (v) => this.game.setSpeed(v),
+      openPanel: (id) => this.open(id),
+    });
+    // Großes Pausesymbol über der entsättigten Szene; Klicks gehen hindurch
+    const pauseMark = h('div', { class: 'pause-mark', 'aria-hidden': 'true' }, svg('<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="58" class="pause-mark__disc"/><rect x="38" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/><rect x="67" y="32" width="15" height="56" rx="5" class="pause-mark__bar"/></svg>'));
+    const stage = h('main', { class: 'stage' }, this.canvas, pauseMark, this.drawer, this.ticker.el, this.advisor.el, this.statsOverlay, this.endOverlay);
+    this.stage = stage;
+    // Absender unten rechts im Weißraum der Kennwertleiste
+    this.metrics.el.append(h('a', { class: 'powered', href: 'https://www.dah-gruppe.de', target: '_blank', rel: 'noopener', 'data-tip': 'Zur Website der DAH Gruppe (öffnet in neuem Fenster).' },
+      h('span', { class: 'powered__label' }, 'powered by'),
+      h('img', { src: logoUrl, alt: 'DAH Gruppe', class: 'powered__logo', width: 140, height: 48 })));
     root.replaceChildren(header, h('div', { class: 'body' }, this.rail, stage, this.metrics.el));
 
     this.scene = makeScene(this.canvas);
@@ -110,6 +150,7 @@ export class App {
     }).observe(stage);
 
     this.setupZoom(stage);
+    this.canvas.addEventListener('mouseleave', () => this.scene.setHover(null));
     this.canvas.addEventListener('click', (e) => {
       if (this.dragged) return;
       this.onCanvasClick(e);
@@ -118,7 +159,7 @@ export class App {
       if (this.pointers.size) return;
       const hit = this.hitAt(e);
       this.canvas.style.cursor = hit ? 'pointer' : this.scene.zoomLevel > 1 ? 'grab' : 'default';
-      this.canvas.title = hit ? hit.label : '';
+      this.scene.setHover(hit ? hit.shape : null);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
 
@@ -130,15 +171,24 @@ export class App {
 
   attach(game: GameController): void {
     this.game = game;
+    this.closeStats(false);
     this.hideOverlay();
+    const name = game.state.scenario.plantName;
+    this.brandEl.textContent = name ?? 'Biogas-Anlage';
+    this.brandEl.title = name ?? '';
     this.ticker.clear(0);
     if (this.attached.has(game)) {
       this.refresh();
       return;
     }
     this.attached.add(game);
+    this.advisor.reset(!!game.state.scenario.tutorial);
     game.on((s, reason) => {
       if (game !== this.game) return;
+      if (reason !== 'speed') {
+        this.advisor.currentDay = s.day;
+        this.advisor.check(s);
+      }
       if (reason !== 'speed') {
         this.scene.update(s);
         this.metrics.update(s);
@@ -149,17 +199,20 @@ export class App {
       }
       this.updateTime();
     });
+    this.updateRail(game.state);
     this.scene.update(game.state);
     this.metrics.update(game.state);
     this.updateCalendar(game.state);
     this.updateTime();
     this.refreshPanel();
     if (game.over) this.showEnd(game.state);
+    else this.advisor.check(game.state);
   }
 
   /** Alles neu zeichnen, z. B. nach einem Sprung im Debug-Modus. */
   refresh(): void {
     const s = this.game.state;
+    this.updateRail(s);
     this.ticker.clear(s.messages.length);
     this.scene.update(s);
     this.metrics.update(s);
@@ -190,10 +243,52 @@ export class App {
   }
 
   private updateTime(): void {
-    for (const b of this.timeButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === Math.min(2, this.game.speed)));
+    for (const b of this.timeButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === this.game.speed));
+    this.updatePause();
+  }
+
+  /** Pause deutlich zeigen: nur im laufenden Spiel, nicht unter Startmenü oder Analyse. */
+  private updatePause(): void {
+    if (!this.stage) return;
+    const paused = this.game.speed === 0 && !this.game.over && this.endOverlay.hidden && this.statsOverlay.hidden;
+    this.stage.classList.toggle('is-paused', paused);
   }
 
   // ---------- Entscheidungsbereiche ----------
+
+  /** Bereiche, die es in der Stufe des Durchlaufs nicht gibt, verschwinden aus der Leiste. */
+  private updateRail(s: GameState): void {
+    this.previewRail(null);
+    for (const p of PANELS) {
+      const btn = this.rail.querySelector(`[data-panel="${p.id}"]`) as HTMLElement | null;
+      if (btn) btn.hidden = p.available ? !p.available(s) : false;
+    }
+    if (this.openPanel && !this.panelAvailable(this.openPanel.id)) this.close();
+  }
+
+  /**
+   * Vorschau im Startmenü: Bereiche, die in der gewählten Stufe wegfallen, grau schraffiert;
+   * eingeschränkte Bereiche mit Markierung. null beendet die Vorschau.
+   */
+  previewRail(level: DifficultyId | null): void {
+    const preview = level ? panelPreview(level) : null;
+    for (const p of PANELS) {
+      const btn = this.rail.querySelector(`[data-panel="${p.id}"]`) as HTMLElement | null;
+      if (!btn) continue;
+      const pv = preview?.find((x) => x.id === p.id);
+      if (!pv) {
+        delete btn.dataset.preview;
+        continue;
+      }
+      btn.hidden = false;
+      btn.dataset.preview = pv.state;
+    }
+  }
+
+  private panelAvailable(id: string): boolean {
+    const p = PANELS.find((x) => x.id === id);
+    return !!p && (!p.available || p.available(this.game.state));
+  }
 
   toggle(id: string): void {
     if (this.openPanel?.id === id) this.close();
@@ -202,7 +297,7 @@ export class App {
 
   open(id: string): void {
     const p = PANELS.find((x) => x.id === id);
-    if (!p) return;
+    if (!p || !this.panelAvailable(id)) return;
     this.openPanel = p;
     this.drawer.hidden = false;
     this.drawerTitle.textContent = p.title;
@@ -286,12 +381,12 @@ export class App {
     c.addEventListener('pointerup', end);
     c.addEventListener('pointercancel', end);
 
-    const btn = (label: string, icon: string, fn: () => void) =>
-      h('button', { type: 'button', class: 'zoom__btn', 'aria-label': label, title: label, onclick: fn }, svg(icon));
+    const btn = (label: string, icon: string, fn: () => void, tip: string) =>
+      h('button', { type: 'button', class: 'zoom__btn', 'aria-label': label, 'data-tip': tip, onclick: fn }, svg(icon));
     stage.append(h('div', { class: 'zoom', role: 'group', 'aria-label': 'Ansicht' },
-      btn('Heranzoomen (+)', ICONS.plus, () => this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP)),
-      btn('Herauszoomen (−)', ICONS.minus, () => this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP))),
-      btn('Ganze Anlage zeigen', ICONS.fit, () => this.scene.resetZoom()),
+      btn('Heranzoomen', ICONS.plus, () => this.scene.zoomBy(ZOOM_STEP * ZOOM_STEP), TIPS.zoomIn),
+      btn('Herauszoomen', ICONS.minus, () => this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP)), TIPS.zoomOut),
+      btn('Ganze Anlage zeigen', ICONS.fit, () => this.scene.resetZoom(), TIPS.zoomFit),
     ));
   }
 
@@ -305,7 +400,9 @@ export class App {
     for (const z of HIT_HEIGHTS) {
       const [x, y] = unproject(v, sx, sy + z * v.scale);
       const hit = HITS.find((hh) => hh.test(x, y));
-      if (hit) return hit;
+      if (hit && this.panelAvailable(hit.panel)) return hit;
+      // Felder ohne eigenen Bereich (Stufe Vereinfacht): dort liefern die Landwirte, also Beschaffung
+      if (hit && hit.panel === 'fields') return { ...hit, panel: 'supply', label: 'Feld eines Landwirts, öffnet Beschaffung', shape: { ...hit.shape, label: 'Feld eines Landwirts, öffnet Beschaffung' } };
     }
     return null;
   }
@@ -322,12 +419,19 @@ export class App {
     // Tastenkürzel gelten überall außer beim Tippen in Text- und Zahlenfelder und in Auswahllisten
     const typing = (t instanceof HTMLInputElement && t.type !== 'range') || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement;
     if (e.key === 'Escape') {
-      if (this.openPanel) this.close();
+      if (!this.statsOverlay.hidden) this.closeStats();
+      else if (this.openPanel) this.close();
       return;
     }
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     // Solange Startmenü oder Analyse offen sind, gelten die Spieltasten nicht
     if (!this.endOverlay.hidden) return;
+    if (e.key.toLowerCase() === 's') {
+      if (this.statsOverlay.hidden) this.openStats();
+      else this.closeStats();
+      return;
+    }
+    if (!this.statsOverlay.hidden) return;
     if (e.key === ' ') {
       if (t instanceof HTMLButtonElement) return;
       this.game.setSpeed(this.game.speed === 0 ? 1 : 0);
@@ -338,6 +442,7 @@ export class App {
     if (e.key === '-') this.scene.zoomBy(1 / (ZOOM_STEP * ZOOM_STEP));
     if (e.key === '1') this.game.setSpeed(1);
     if (e.key === '2') this.game.setSpeed(2);
+    if (e.key === '3') this.game.setSpeed(4);
     if (e.key === '0') this.game.setSpeed(0);
     const p = PANELS.find((x) => x.key === e.key.toLowerCase());
     if (p) this.toggle(p.id);
@@ -347,9 +452,37 @@ export class App {
 
   private showEnd(s: GameState): void {
     this.close();
+    this.advisor.reset(false);
     this.ticker.clear(s.messages.length);
-    const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra: this.endExtra?.(s) ?? null });
+    const extra = this.endExtra?.(s) ?? null;
+    const view = buildAnalysis(s, { onRestart: () => this.restart(), onMenu: () => this.toMenu(), extra, sessionBest: this.sessionBest?.() ?? null });
     this.showOverlay(view);
+  }
+
+  // ---------- Statistik während des Spiels ----------
+
+  /** Statistik bis heute öffnen; das Spiel pausiert, bis die Ansicht geschlossen wird. */
+  openStats(focus?: string): void {
+    if (this.game.over || !this.endOverlay.hidden) return;
+    if (this.statsOverlay.hidden) this.statsResume = this.game.speed;
+    this.game.setSpeed(0);
+    this.close();
+    const view = buildStats(this.game.state, { plantName: this.game.state.scenario.plantName ?? null, onClose: () => this.closeStats(), focus });
+    this.statsOverlay.replaceChildren(h('div', { class: 'end__card' }, view));
+    this.statsOverlay.hidden = false;
+    if (!focus) this.statsOverlay.scrollTop = 0;
+    this.setBackgroundInert(true);
+    (this.statsOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus({ preventScroll: true });
+    this.updatePause();
+  }
+
+  closeStats(resume = true): void {
+    if (this.statsOverlay.hidden) return;
+    this.statsOverlay.hidden = true;
+    this.statsOverlay.replaceChildren();
+    this.setBackgroundInert(false);
+    if (resume && !this.game.over) this.game.setSpeed(this.statsResume);
+    this.updatePause();
   }
 
   /** Startmenü oder Analyse über der Spielfläche zeigen. */
@@ -361,20 +494,25 @@ export class App {
     // Leiste und Zeitsteuerung sind hinter Startmenü und Analyse nicht bedienbar
     this.setBackgroundInert(true);
     (this.endOverlay.querySelector('.btn--primary') as HTMLElement | null)?.focus();
+    this.updatePause();
   }
 
   hideOverlay(): void {
     this.endOverlay.hidden = true;
     this.setBackgroundInert(false);
+    this.updatePause();
   }
 
   private setBackgroundInert(on: boolean): void {
-    for (const el of [this.rail, this.timeButtons[0]?.parentElement]) {
+    for (const el of [this.rail, this.timeButtons[0]?.parentElement?.parentElement, this.metrics.el]) {
       if (!el) continue;
       if (on) el.setAttribute('inert', '');
       else el.removeAttribute('inert');
     }
   }
+
+  /** Bester Kontostand der Sitzung, von außen gesetzt. */
+  sessionBest?: () => number | null;
 
   /** Zusatzinhalt für das Ende (Speichercode, Freischaltungen), von außen gesetzt. */
   endExtra?: (s: GameState) => HTMLElement | null;

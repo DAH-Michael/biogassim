@@ -90,6 +90,10 @@ export const BACKGROUND: Record<string, string> = {
     'Eine Biogasanlage hat hohe laufende Kosten und Einnahmen, die monatlich kommen. Große Zahlungen wie die Maisernte im Herbst oder Reparaturen werden über den Kreditrahmen überbrückt. Ist er dauerhaft überzogen, kündigt die Bank.',
   contaminants:
     'Reststoffe aus der Lebensmittelverarbeitung sind günstig und energiereich, aber nicht immer sauber. Verpackungsreste und Fremdkörper beschädigen Pumpen und Rührwerke.',
+  grid_outage:
+    'Bei Störungen im Stromnetz muss eine Anlage ihre Einspeisung unterbrechen. Ohne BHKW füllt sich der Gasspeicher, und der Fermenter bekommt keine Abwärme.',
+  stirrer_failure:
+    'Rührwerke halten den Fermenterinhalt in Bewegung, damit Mikroorganismen und Futter in Kontakt kommen und keine Schwimmschichten entstehen. Fällt eines aus, kann weniger gefüttert werden.',
   residue_lot_started:
     'Jede Partie Reststoffe ist anders zusammengesetzt. Sie bauen schnell ab und erzeugen in kurzer Zeit viel Säure. Für die Biologie ist jede neue Partie ein kleiner Futterwechsel.',
 };

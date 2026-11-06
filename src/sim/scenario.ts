@@ -4,6 +4,7 @@ import { createEventLog, logEvent } from './eventlog';
 import { createBiology, round, warmUpBiology, zeroMap } from './biology';
 import { deriveRng, intRange } from './rng';
 import { generateWeather } from './weather';
+import { difficulty } from './difficulty';
 import type { FieldState, GameState, ScenarioOptions } from './types';
 
 /**
@@ -13,7 +14,7 @@ import type { FieldState, GameState, ScenarioOptions } from './types';
  */
 export function createGame(seed: number, scenario: ScenarioOptions = { id: 'altanlage' }, unlocks: string[] = []): GameState {
   const sc = CONFIG.scenarios[scenario.id];
-  const weather = generateWeather(seed);
+  const weather = generateWeather(seed, difficulty({ scenario }).droughtChance);
   const log = createEventLog();
   const rngFields = deriveRng(seed, 'fields');
 
@@ -116,6 +117,7 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
       residualCh4: 0,
       spreadOrderM3: 0,
       spreadToday: 0,
+      offtakeToday: 0,
       spreadTotal: 0,
       spreadBeforeBlackout: 0,
       demandBeforeBlackout: 0,
@@ -176,7 +178,7 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
     finished: false,
     origin,
     log,
-    totals: { kwhEl: 0, kwhHeatSold: 0, flaredM3: 0, ch4LostStorageM3: 0, ch4ProducedM3: 0, bioErrorDays: 0, trafficTrips: 0 },
+    totals: { kwhEl: 0, kwhSold: 0, kwhHeatSold: 0, flaredM3: 0, ch4LostStorageM3: 0, ch4ProducedM3: 0, bioErrorDays: 0, trafficTrips: 0 },
     contaminationEvent: undefined,
     lastFed: { ...feedStart },
     supplyEvents: {},
@@ -189,7 +191,7 @@ export function createGame(seed: number, scenario: ScenarioOptions = { id: 'alta
     },
     actionLog: [],
     noticeFlags: {},
-    today: { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0 },
+    today: { deliveries: [], guelle: [], residueArrived: false, harvesting: [], sowing: [], spreadM3: 0, offtakeM3: 0, siloSoldT: 0 },
   };
 
   // Bestehende Gülleverträge des Vorbesitzers

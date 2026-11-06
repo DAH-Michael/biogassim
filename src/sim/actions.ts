@@ -8,6 +8,21 @@ import { offerOpen, offerPrice, spotPrice, supplyOffer, isMaizeOffer } from './c
 import { performService } from './tech';
 import { ledger } from './storage';
 import type { Action, GameState } from './types';
+import { buildAvailable, hasFeature, roleAvailable } from './difficulty';
+
+/** Ist die Entscheidung im Schwierigkeitsgrad des Durchlaufs vorgesehen? */
+export function actionAvailable(state: GameState, a: Action): boolean {
+  switch (a.type) {
+    case 'buyResidue': return hasFeature(state, 'reststoffe');
+    case 'leaseField': return hasFeature(state, 'felder');
+    case 'setCrop': return hasFeature(state, 'felder') && (a.crop !== 'zweikultur' || hasFeature(state, 'felder_experten'));
+    case 'setHarvestDay': return hasFeature(state, 'felder_experten');
+    case 'orderService': return a.kind === 'klein' || (a.kind === 'gross' ? hasFeature(state, 'instandsetzung') : hasFeature(state, 'entschwefelung'));
+    case 'hire': return roleAvailable(state, a.role);
+    case 'build': return buildAvailable(state, a.kind);
+    default: return true;
+  }
+}
 
 /**
  * Spielerentscheidungen. Jede gültige Entscheidung wird als Ereignis mit
@@ -34,6 +49,7 @@ function massShare(feed: Record<string, number>, key: string): number {
 
 function apply(state: GameState, a: Action): ActionResult {
   const day = state.day;
+  if (!actionAvailable(state, a)) return { ok: false, reason: 'stufe' };
   switch (a.type) {
     case 'setFeeding': {
       const next = { ...state.feedTarget };

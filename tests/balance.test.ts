@@ -10,8 +10,8 @@ import type { GameState, ScenarioOptions } from '../src/sim/types';
  * Ändert sich das Balancing, zeigen diese Tests, ob die beabsichtigten Muster erhalten bleiben.
  */
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
-function runs(name: string, scenario: ScenarioOptions['id'] = 'altanlage'): GameState[] {
-  return SEEDS.map((s) => runToEnd(createGame(s, { id: scenario }), STRATEGIES[name].strategy));
+function runs(name: string, scenario: ScenarioOptions['id'] = 'altanlage', difficulty: ScenarioOptions['difficulty'] = 'normal'): GameState[] {
+  return SEEDS.map((s) => runToEnd(createGame(s, { id: scenario, difficulty }), STRATEGIES[name].strategy));
 }
 const successRate = (gs: GameState[]) => gs.filter((g) => !g.failure).length / gs.length;
 
@@ -48,7 +48,9 @@ describe('Balancing-Ziele', () => {
     const tech = runs('mit_techniker');
     const avg = (gs: GameState[], f: (g: GameState) => number) => gs.reduce((a, g) => a + f(g), 0) / gs.length;
     expect(avg(tech, (g) => yearSummary(g).gasLossShare)).toBeLessThan(avg(base, (g) => yearSummary(g).gasLossShare));
-    expect(avg(runs('mit_vermarkter'), (g) => yearSummary(g).profitEur)).toBeGreaterThan(avg(base, (g) => yearSummary(g).profitEur));
+    // Der Energievermarkter gehört zum vollen Funktionsumfang (Stufe Real)
+    const realBase = runs('kein_personal', 'altanlage', 'real');
+    expect(avg(runs('mit_vermarkter', 'altanlage', 'real'), (g) => yearSummary(g).profitEur)).toBeGreaterThan(avg(realBase, (g) => yearSummary(g).profitEur));
   });
 
   it('die höchste Stufe ist erreichbar, aber nicht selbstverständlich', () => {

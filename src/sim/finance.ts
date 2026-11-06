@@ -35,6 +35,11 @@ export function marketerBonusPerKwh(state: GameState): number {
   return st.marketerBaseEurPerKwh + st.marketerPerStorageHourEurPerKwh * Math.max(0, hours - st.marketerReferenceStorageHours);
 }
 
+/** Eigenstrombedarf eines Tages bei gegebener Erzeugung, kWh */
+export function ownPowerKwh(kwhEl: number): number {
+  return PL.ownPowerBaseKw * CONFIG.units.hoursPerDay + kwhEl * PL.ownPowerShare;
+}
+
 export function maizeShare(state: GameState): number {
   const total = sumMap(state.inputTotals);
   return total > 0 ? state.inputTotals.mais / total : 0;
@@ -52,11 +57,19 @@ export function financeDay(state: GameState, inp: FinanceInput): void {
   }
 
   // Erzeugung sammeln
-  const sold = inp.kwhEl * (1 - PL.ownPowerShare);
+  const own = ownPowerKwh(inp.kwhEl);
+  const sold = Math.max(0, inp.kwhEl - own);
+  const bought = Math.max(0, own - inp.kwhEl);
+  if (bought > 0) {
+    const cost = bought * PL.gridPurchaseEurPerKwh;
+    fin.balance -= cost;
+    ledger(state, 'netzstrom', cost);
+  }
   fin.monthKwh += sold;
   fin.monthDays++;
   fin.monthMarketValueSum += fin.marketPrice;
   state.totals.kwhEl += inp.kwhEl;
+  state.totals.kwhSold += sold;
   if (hasStaff(state, 'vermarkter')) fin.monthMarketerEur += sold * marketerBonusPerKwh(state);
   if (state.heatLineActive) {
     const heat = Math.min(villageHeatDemandKwh(state), inp.kwhTh * F.heatShareAvailable);
@@ -67,7 +80,7 @@ export function financeDay(state: GameState, inp: FinanceInput): void {
   // Entgangene Erlöse der Ursache zuordnen
   const fullKwh = chpCh4PerDay() * PL.methaneKwhPerM3 * PL.chpEtaEl;
   const shortfall = Math.max(0, fullKwh - inp.kwhEl);
-  if (shortfall > fullKwh * F.shortfallTolerance) addCause(fin.lossCauses, inp.shortfallCause, shortfall * (1 - PL.ownPowerShare) * F.eegEurPerKwh);
+  if (shortfall > fullKwh * F.shortfallTolerance) addCause(fin.lossCauses, inp.shortfallCause, shortfall * F.eegEurPerKwh);
 
   // Monatsabrechnung am Monatsersten
   if (day > 0 && dateOfDay(day).dayOfMonth === 1) settleMonth(state);

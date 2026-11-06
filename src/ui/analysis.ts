@@ -7,6 +7,7 @@ import { BACKGROUND, eventIcon, outcomeSentence, tierName } from '../content/ana
 import type { GameState } from '../sim/types';
 import { buildTimeline } from './charts';
 import { fmt, h } from './dom';
+import { TIPS } from '../content/tooltips.de';
 
 /**
  * Analyse nach dem Ende eines Durchlaufs, in drei aufklappbaren Ebenen:
@@ -15,9 +16,13 @@ import { fmt, h } from './dom';
  * 3. Verläufe der wichtigsten Werte mit Ereignismarken.
  * Bei Erfolg: Jahresbilanz mit Bewertung, wichtige Ereignisse und Verläufe.
  */
+const LEVEL_NAMES = { vereinfacht: 'Vereinfacht', normal: 'Normal', real: 'Real' } as const;
+
 export interface AnalysisOptions {
   onRestart: () => void;
   onMenu?: () => void;
+  /** bester Kontostand eines beendeten Jahres in dieser Sitzung (nur im Speicher) */
+  sessionBest?: number | null;
   /** Zusatzinhalt nach Ebene 1 (Speichercode, Freischaltungen; Meilenstein 5) */
   extra?: HTMLElement | null;
 }
@@ -25,22 +30,54 @@ export interface AnalysisOptions {
 export function buildAnalysis(s: GameState, opts: AnalysisOptions): HTMLElement {
   const y = yearSummary(s);
   const failed = s.failure !== null;
-  const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', onclick: opts.onRestart }, 'Neuer Versuch');
+  const restart = h('button', { type: 'button', class: 'btn btn--primary btn--large', 'data-tip': TIPS.restart, onclick: opts.onRestart }, 'Neuer Versuch');
 
   const head = h('header', { class: 'analysis__head' },
-    h('p', { class: 'eyebrow' }, failed ? 'Durchlauf beendet' : 'Jahresbilanz'),
+    h('p', { class: 'eyebrow' }, `${s.scenario.plantName ? `${s.scenario.plantName}: ` : ''}${failed ? 'Durchlauf beendet' : 'Jahresbilanz'}, Stufe ${LEVEL_NAMES[s.scenario.difficulty ?? 'normal']}`),
     h('h2', { id: 'end-title' }, failed ? FAILURE_TITLES[s.failure!.kind] : tierName(y.tier)),
     h('p', { class: 'analysis__sentence' }, outcomeSentence(s)),
-    h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', onclick: opts.onMenu }, 'Zum Startmenü') : null),
+    h('div', { class: 'row' }, restart, opts.onMenu ? h('button', { type: 'button', class: 'btn btn--large', 'data-tip': TIPS.toMenu, onclick: opts.onMenu }, 'Zum Startmenü') : null),
   );
 
-  const parts: HTMLElement[] = [head];
+  const parts: HTMLElement[] = [head, scoreCard(s, opts.sessionBest ?? null)];
   if (opts.extra) parts.push(opts.extra);
   parts.push(summaryBlock(s, failed));
   if (failed) parts.push(chainBlock(s));
   else parts.push(eventsBlock(s));
   parts.push(h('details', { class: 'level' }, h('summary', {}, h('span', { class: 'level__title' }, 'Verläufe über das Jahr')), buildTimeline(s)));
   return h('div', { class: 'analysis' }, ...parts);
+}
+
+// ---------- Ergebnis zum Vergleichen ----------
+
+const SCENARIO_NAMES: Record<string, string> = { altanlage: 'Altanlage', eigene_felder: 'Mit eigenen Feldern', schwieriger_standort: 'Schwieriger Standort' };
+
+/**
+ * Ergebnis des Durchlaufs, gut lesbar für einen Screenshot oder den Vergleich mit Kollegen.
+ * Gewertet wird der Kontostand am Ende eines vollen Jahres. Gespeichert wird nichts.
+ */
+function scoreCard(s: GameState, best: number | null): HTMLElement {
+  const y = yearSummary(s);
+  const failed = s.failure !== null;
+  const chips = [
+    `Stufe ${LEVEL_NAMES[s.scenario.difficulty ?? 'normal']}`,
+    SCENARIO_NAMES[s.scenario.id] ?? s.scenario.id,
+    s.scenario.tutorial ? 'mit Beraterin' : null,
+    failed ? null : `Bewertung ${tierName(y.tier)}`,
+    `gespielt am ${new Date().toLocaleDateString('de-DE')}`,
+  ].filter(Boolean) as string[];
+  const isBest = !failed && best !== null && Math.round(s.finance.balance) >= Math.round(best);
+  return h('section', { class: `score${failed ? ' score--failed' : ''}`, 'aria-label': 'Ergebnis' },
+    s.scenario.plantName ? h('p', { class: 'score__name' }, s.scenario.plantName) : null,
+    h('div', { class: 'score__main' },
+      h('p', { class: 'score__label' }, failed ? `Kontostand beim Scheitern am ${formatDate(s.failure!.day)}` : 'Kontostand am 31. Juli'),
+      h('p', { class: 'score__value' }, fmt.eur(s.finance.balance)),
+      h('p', { class: 'score__note' }, failed
+        ? 'Das Jahr wurde nicht beendet und zählt nicht als Ergebnis.'
+        : isBest && best !== null ? 'Ihr bestes Ergebnis in dieser Sitzung.' : best !== null ? `Ihr bestes Ergebnis in dieser Sitzung: ${fmt.eur(best)}` : 'Ihr Ergebnis zum Vergleichen mit Kolleginnen und Kollegen.'),
+    ),
+    h('ul', { class: 'score__chips' }, ...chips.map((c) => h('li', {}, c))),
+  );
 }
 
 // ---------- Kennzahlen ----------

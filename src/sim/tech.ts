@@ -4,6 +4,7 @@ import { round } from './biology';
 import { chance, intRange, range } from './rng';
 import { say } from './messages';
 import { hasStaff, ledger } from './storage';
+import { difficulty, hasFeature } from './difficulty';
 import type { GameState } from './types';
 
 /**
@@ -53,7 +54,7 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
   desulf.rawPpm = rawUnits * DS.rawPpmPerUnit;
   const loadRel = (ch4ProducedM3 / chpCh4PerDay()) * rawUnits;
   if (desulf.mediumDays > 0) {
-    desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
+    if (difficulty(state).desulfConsumable && hasFeature(state, 'entschwefelung')) desulf.mediumDays = Math.max(0, desulf.mediumDays - loadRel);
     desulf.cleanPpm = desulf.rawPpm * DS.withMediumResidual;
   } else {
     desulf.cleanPpm = desulf.rawPpm * (1 - DS.biologicalRemoval);
@@ -99,7 +100,8 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
 
   // Verschleiß
   const overdue = Math.max(0, chp.hoursSinceService - C.serviceIntervalH) / C.serviceIntervalH;
-  const h2sMult = 1 + C.h2sWearPer100ppm * (desulf.cleanPpm / 100);
+  // Ohne Entschwefelung als Funktion (Stufe Vereinfacht) gibt es auch keinen Schwefel-Verschleiß
+  const h2sMult = hasFeature(state, 'entschwefelung') ? 1 + C.h2sWearPer100ppm * (desulf.cleanPpm / 100) : 1;
   const overdueMult = 1 + C.overdueWearFactor * overdue;
   let wear = (C.wearPerYear / C.wearReferenceHours) * hours * h2sMult * overdueMult;
   if (hasStaff(state, 'techniker')) wear *= CONFIG.staff.technicianWearFactor;
@@ -140,6 +142,7 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
     let p = C.failureBasePerDay * (1 + C.failureOverdueFactor * overdue) * (1 + C.failureWearFactor * Math.max(0, chp.wear - C.failureWearThreshold)) * Math.sqrt(h2sMult);
     if (hasStaff(state, 'techniker')) p *= CONFIG.staff.technicianFailureFactor;
     if (state.maintenanceContract) p *= CONFIG.maintenanceContract.failureFactor;
+    p *= difficulty(state).chpFailureFactor;
     if (chance(state.rng.tech, p)) {
       let days = intRange(state.rng.tech, C.failureDowntimeDays[0], C.failureDowntimeDays[1]);
       if (hasStaff(state, 'techniker')) days = Math.max(1, Math.round(days * CONFIG.staff.technicianDowntimeFactor));
@@ -160,6 +163,15 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
       addCause(state.finance.lossCauses, ev.id, cost);
       say(state, 'betriebsleiter', 'bhkw_stoerung', { tage: days }, ev.id);
     }
+  }
+
+  // Netzausfall (Stufe Real): das BHKW darf nicht einspeisen und schaltet ab
+  if (chp.status === 'betrieb' && chance(state.rng.tech, difficulty(state).gridOutagePerDay)) {
+    const ev = logEvent(log, day, { type: 'grid_outage', severity: 'warning', causes: [], data: { days: CONFIG.realEvents.gridOutageDays } });
+    chp.status = 'stoerung';
+    chp.downUntilDay = day + CONFIG.realEvents.gridOutageDays;
+    chp.downEvent = ev.id;
+    say(state, 'netzbetreiber', 'netzausfall', {}, ev.id);
   }
 
   // Totalschaden
@@ -218,7 +230,8 @@ export function techDay(state: GameState, ch4ProducedM3: number): TechResult {
     gas.flareEvent = undefined;
   }
 
-  const kwhEl = ch4Used * PL.methaneKwhPerM3 * PL.chpEtaEl;
+  const eta = PL.chpEtaEl * (hasStaff(state, 'techniker') ? 1 + CONFIG.staff.technicianEtaBonus : 1);
+  const kwhEl = ch4Used * PL.methaneKwhPerM3 * eta;
   const kwhTh = ch4Used * PL.methaneKwhPerM3 * PL.chpEtaTh;
   return { kwhEl, kwhTh, ch4Used };
 }
@@ -243,7 +256,8 @@ export function performService(state: GameState, kind: 'klein' | 'gross' | 'ents
   const cfg = kind === 'klein' ? C.smallService : C.majorService;
   let days: number = cfg.downtimeDays;
   if (hasStaff(state, 'techniker')) days = Math.max(1, Math.round(days * CONFIG.staff.technicianDowntimeFactor));
-  const cost = kind === 'klein' && state.maintenanceContract ? 0 : cfg.costEur;
+  let cost = kind === 'klein' && state.maintenanceContract ? 0 : cfg.costEur;
+  if (kind === 'klein' && hasStaff(state, 'techniker')) cost *= CONFIG.staff.technicianServiceCostFactor;
   const ev = logEvent(state.log, state.day, {
     type: kind === 'klein' ? 'service_small' : 'service_major',
     causes: [cause],

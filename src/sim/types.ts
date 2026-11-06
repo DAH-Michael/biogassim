@@ -197,6 +197,7 @@ export interface DigestateState {
   spreadOrderM3: number;
   spreadOrderEvent?: string;
   spreadToday: number;
+  offtakeToday: number;
   spreadTotal: number;
   /** Ausbringung im Zeitraum vor der Sperrfrist */
   spreadBeforeBlackout: number;
@@ -287,8 +288,13 @@ export interface Unlocks {
 
 export interface ScenarioOptions {
   id: 'altanlage' | 'eigene_felder' | 'schwieriger_standort';
+  difficulty?: 'vereinfacht' | 'normal' | 'real';
+  /** Tutorial-Modus mit DAH-Beraterin (nur Oberfläche, ohne Einfluss auf die Simulation) */
+  tutorial?: boolean;
   largerStorage?: boolean;
   heatLineAtStart?: boolean;
+  /** Selbst gewählter Name der Anlage: nur Anzeige in diesem Durchlauf, wird nirgends gespeichert */
+  plantName?: string;
 }
 
 export interface GameState {
@@ -360,6 +366,8 @@ export interface GameState {
   /** Kennzahlen fürs Jahr */
   totals: {
     kwhEl: number;
+    /** eingespeist nach Abzug des Eigenstroms */
+    kwhSold: number;
     kwhHeatSold: number;
     flaredM3: number;
     ch4LostStorageM3: number;
@@ -408,4 +416,8 @@ export interface TodayLogistics {
   /** Felder, die heute bestellt wurden */
   sowing: string[];
   spreadM3: number;
+  /** an Betriebe mit eigenem Lager abgegebener Gärrest, m³ */
+  offtakeM3: number;
+  /** wegen vollem Silo abgegebene Silage, t */
+  siloSoldT: number;
 }
