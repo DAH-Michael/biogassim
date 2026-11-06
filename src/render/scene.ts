@@ -7,6 +7,8 @@ import { mix, rgb, shade, type Palette, type Rgb } from './palette';
 import { Draw } from './shapes';
 import { CONTRACT_FIELDS, FIELD_ROUTES, FIELDS, NEIGHBOR_FIELDS, NORTH_ROAD_X, ORIGINS, PLANT, ROAD_Y, VILLAGE, WORLD, type Pt } from './layout';
 import { contractField, planTrips, tripPosition, type Trip } from './vehicles';
+import { cfg, hasChp, plantScale } from '../sim/plant';
+import { biogasPerHourAtFullLoad } from '../sim/tech';
 
 type Rect = { x: number; y: number; w: number; d: number };
 interface FieldView { standing: string; growth: number; harvested: number; own: boolean; harvesting: boolean; sowing: boolean }
@@ -257,7 +259,17 @@ export class Scene {
     items.push({ depth: P.storage.cx + P.storage.cy, draw: () => this.drawStorage(d, st, s, t, P.storage) });
     if (st.built.digestateStorage) items.push({ depth: P.storage2.cx + P.storage2.cy, draw: () => this.drawStorage(d, st, s, t, P.storage2) });
     items.push({ depth: P.pit.cx + P.pit.cy, draw: () => this.drawPit(d, st) });
-    items.push({ depth: P.chp.x + P.chp.w + P.chp.y + P.chp.d, draw: () => this.drawChp(d, st, t) });
+    if (hasChp(st)) items.push({ depth: P.chp.x + P.chp.w + P.chp.y + P.chp.d, draw: () => this.drawChp(d, st, t) });
+    const scaleK = plantScale(st);
+    if (scaleK > 1) {
+      items.push({ depth: P.yard2.x - 0.5, draw: () => d.rect(P.yard2.x, P.yard2.y, P.yard2.w, P.yard2.d, 0, mix(this.pal.concrete, this.pal.k10, 0.4), this.pal.k40) });
+      items.push({ depth: P.fermenter2.cx + P.fermenter2.cy, draw: () => this.drawTank(d, P.fermenter2, false, s) });
+    }
+    if (scaleK > 2) items.push({ depth: P.post2.cx + P.post2.cy, draw: () => this.drawTank(d, P.post2, true, s) });
+    if (st.upgrading) {
+      items.push({ depth: P.upgrading.x + P.upgrading.w + P.upgrading.y + P.upgrading.d, draw: () => this.drawUpgrading(d, st, t) });
+      items.push({ depth: P.injection.x + P.injection.w + P.injection.y + P.injection.d, draw: () => this.drawInjection(d, st, t) });
+    }
     if (hasFeature(st, 'entschwefelung')) items.push({ depth: P.desulf.cx + P.desulf.cy, draw: () => this.drawDesulf(d, s) });
     if (st.built.gasStorage) items.push({ depth: P.gasStorage2.cx + P.gasStorage2.cy, draw: () => this.drawGasStorage2(d, s) });
     items.push({ depth: P.flare.x + P.flare.y, draw: () => this.drawFlare(d, st, t) });
@@ -491,7 +503,7 @@ export class Scene {
     const p = this.pal;
     const S = PLANT.silo;
     const half = S.w / 2;
-    const cap = CONFIG.plant.siloCapacityT / 2;
+    const cap = cfg(st).plant.siloCapacityT / 2;
     // Stapelhöhe bleibt unter der Wandkrone, damit nichts durch die Wände ragt
     const pileH = (fill: number) => 0.15 + fill * (S.wall - 0.3);
     const activeKind = st.silo.deliveredToday > 0 ? (st.today.deliveries.some((x) => x.kind === 'gruenroggen') ? 1 : 0) : -1;
@@ -573,7 +585,7 @@ export class Scene {
     }
     d.disc(F.cx, F.cy, 0.35, F.h + 0.06, p.white);
     // Gasblasen: gleichmäßig und dicht im Normalbetrieb, unregelmäßig bei Störung, keine wenn gekippt
-    const gasRel = clamp01(st.gas.producedToday / (CONFIG.plant.chpPowerKwEl / CONFIG.plant.chpEtaEl / CONFIG.plant.methaneKwhPerM3 * 24 / bio.ch4Share));
+    const gasRel = clamp01(st.gas.producedToday / (biogasPerHourAtFullLoad(st, bio.ch4Share) * 24));
     const n = bio.tipped ? 0 : Math.round(3 + gasRel * 5);
     for (let i = 0; i < n; i++) {
       const jitter = disturbance * Math.sin(t * 5 + i * 7) * 0.6;
@@ -628,7 +640,7 @@ export class Scene {
     const p = this.pal;
     const V = PLANT.pit;
     d.cylinder(V.cx, V.cy, V.r, 0.5, p.concrete, null);
-    const level = clamp01(st.fedToday.guelle / CONFIG.feeding.start.guelle);
+    const level = clamp01(st.fedToday.guelle / cfg(st).feeding.start.guelle);
     d.disc(V.cx, V.cy, V.r - 0.1, 0.1 + 0.35 * level, p.slurry);
   }
 
@@ -658,6 +670,55 @@ export class Scene {
       // Austausch: Kranarm über dem Gebäude
       d.line([B.x - 0.5, B.y + B.d, 0], [B.x - 0.5, B.y + B.d, B.h + 3], p.gelb, Math.max(2, this.view.scale * 0.15));
       d.line([B.x - 0.5, B.y + B.d, B.h + 3], [B.x + B.w, B.y + B.d / 2, B.h + 3], p.gelb, Math.max(2, this.view.scale * 0.15));
+    }
+  }
+
+  /** Weiterer Fermenter oder Nachgärer einer größeren Anlage (ohne eigene Animation). */
+  private drawTank(d: Draw, T: { cx: number; cy: number; r: number; h: number }, dome: boolean, s: Snap): void {
+    const p = this.pal;
+    d.cylinder(T.cx, T.cy, T.r, T.h, p.white, null);
+    d.cylinder(T.cx, T.cy, T.r + 0.01, 0.3, p.dunkelgruen, null, T.h - 0.55);
+    if (dome) d.dome(T.cx, T.cy, T.r, T.h, T.r * (0.15 + 0.85 * clamp01(s.gasShare)), p.k10);
+    else d.disc(T.cx, T.cy, T.r, T.h, shade(p['dunkelgruen-70'], -0.1));
+  }
+
+  /** Gasaufbereitung: Container mit Membranmodulen; läuft sie, blinkt eine Lampe und rauscht der Verdichter. */
+  private drawUpgrading(d: Draw, st: GameState, t: number): void {
+    const p = this.pal;
+    const B = PLANT.upgrading;
+    const upg = st.upgrading!;
+    // Membranmodule: drei schlanke Säulen hinter dem Container (zuerst zeichnen, sie liegen weiter hinten)
+    for (let i = 0; i < 3; i++) d.cylinder(B.x + 0.45 + i * 0.6, B.y - 0.35, 0.18, B.h + 0.9, p.k20, p.k40);
+    d.box(B.x, B.y, B.w, B.d, B.h, p.white, 0, p.roof);
+    const running = upg.status === 'betrieb' && upg.runShare > 0.02;
+    if (running) {
+      d.sound(B.x + B.w + 0.4, B.y + B.d + 0.2, 0.8, 0.6, p.k60, t);
+      // Abgas (CO₂) als feine Fahne aus dem Abgasrohr
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 0.4 + i / 4) % 1;
+        d.puff(B.x + 0.45 + ph * 0.8, B.y - 0.35 - ph * 0.3, B.h + 1.0 + ph * 1.4, 0.15 + ph * 0.35, p.k10, (1 - ph) * 0.6);
+      }
+    }
+    if (upg.status === 'stoerung') this.overlays.push(() => d.warning(B.x + B.w / 2, B.y + B.d / 2, B.h + 2.0, 0.9, p.warning, p.ink));
+    else if (upg.status === 'wartung') this.overlays.push(() => d.wrench(B.x + B.w / 2, B.y + B.d / 2, B.h + 1.8, 0.8, p.k80, t));
+  }
+
+  /** Einspeisestation mit gelber Gasleitung (Kennfarbe für Gas) zum Netz. */
+  private drawInjection(d: Draw, st: GameState, t: number): void {
+    const p = this.pal;
+    const E = PLANT.injection;
+    const upg = st.upgrading!;
+    d.box(E.x, E.y, E.w, E.d, E.h, p.k10, 0, p.k40);
+    // Leitung zur Grundstücksgrenze
+    d.line([E.x + E.w, E.y + E.d / 2, 0.3], [PLANT.yard.x + PLANT.yard.w, E.y + E.d / 2, 0.3], p.gelb, Math.max(2, this.view.scale * 0.18));
+    d.line([PLANT.upgrading.x + PLANT.upgrading.w / 2, PLANT.upgrading.y + PLANT.upgrading.d, 0.3], [E.x + E.w / 2, E.y, 0.3], p.gelb, Math.max(2, this.view.scale * 0.18));
+    // Einspeisestopp: Warnzeichen an der Station; Einspeisung: wandernder Punkt auf der Leitung
+    if (upg.status === 'einspeisestopp') this.overlays.push(() => d.warning(E.x + E.w / 2, E.y + E.d / 2, E.h + 1.6, 0.8, p.warning, p.ink));
+    else if (upg.status === 'betrieb' && upg.runShare > 0.02) {
+      const ph = (t * 0.6) % 1;
+      const x0 = E.x + E.w;
+      const x1 = PLANT.yard.x + PLANT.yard.w;
+      d.disc(x0 + (x1 - x0) * ph, E.y + E.d / 2, 0.14, 0.32, p['gelb-ink']);
     }
   }
 

@@ -26,9 +26,9 @@ export const UNLOCKS: UnlockDef[] = [
   { key: 'abdeckung_guenstig', trigger: { kind: 'failure', failureType: 'failure_acceptance' }, title: 'Günstigere Lagerabdeckung', text: 'Die Abdeckung des Gärrestlagers kostet weniger.' },
   { key: 'wartungsvertrag', trigger: { kind: 'failure', failureType: 'failure_technical' }, title: 'Wartungsvertrag', text: 'Feste Monatskosten, Wartung inklusive, geringeres Ausfallrisiko.' },
   { key: 'kostenaufstellung', trigger: { kind: 'failure', failureType: 'failure_insolvency' }, title: 'Kosten pro Kilowattstunde', text: 'Eine Aufstellung, was jede Kilowattstunde kostet.' },
-  { key: 'eigene_felder', trigger: { kind: 'success', minTier: 0 }, title: 'Eigene Felder', text: 'Startszenario mit eigenen Feldern von Beginn an.' },
+  { key: 'eigene_felder', trigger: { kind: 'success', minTier: 0 }, title: 'Biomethananlage', text: 'Eine größere Anlage mit Gasaufbereitung statt BHKW und eigenen Feldern.' },
   { key: 'waermeleitung_start', trigger: { kind: 'success', minTier: 2 }, title: 'Wärmeleitung ab Start', text: 'Die Wärmeleitung ins Dorf kann von Beginn an genutzt werden.' },
-  { key: 'schwieriger_standort', trigger: { kind: 'success', minTier: 2 }, title: 'Schwieriger Standort', text: 'Ein Standort mit weniger Gülle in der Nähe und dem Dorf direkt an der Zufahrt.' },
+  { key: 'schwieriger_standort', trigger: { kind: 'success', minTier: 2 }, title: 'Verbundanlage', text: 'Die größte Anlage mit BHKW und Gasaufbereitung, an einem Standort mit wenig Gülle und dem Dorf an der Zufahrt.' },
 ];
 
 export function keysToFlags(keys: readonly string[]): number {

@@ -1,3 +1,4 @@
+import { CONFIG } from '../sim/config';
 import { UNLOCKS } from '../meta/unlocks.config';
 import { decodeSaveCode } from '../meta/savecode';
 import { flagsToKeys } from '../meta/unlocks.config';
@@ -26,10 +27,18 @@ export interface MenuOptions {
   onLevelPreview?: (level: NonNullable<ScenarioOptions['difficulty']>) => void;
 }
 
+const PS = {
+  altanlage: CONFIG.scenarios.altanlage.plant,
+  eigene_felder: CONFIG.scenarios.eigene_felder.plant,
+  schwieriger_standort: CONFIG.scenarios.schwieriger_standort.plant,
+};
+/** Größe relativ zur Altanlage als Text, z. B. „1,8-mal“ */
+const times = (k: number) => `${k.toLocaleString('de-DE', { maximumFractionDigits: 1 })}-mal`;
+
 const SCENARIOS: { id: ScenarioOptions['id']; title: string; text: string; needs?: string }[] = [
-  { id: 'altanlage', title: 'Altanlage', text: 'Der Vorbesitzer hat sich zur Ruhe gesetzt. Die Anlage läuft, ist aber in die Jahre gekommen. Seine Felder sind noch bis Mitte Oktober verpachtet.' },
-  { id: 'eigene_felder', title: 'Mit eigenen Feldern', text: 'Dieselbe Anlage, aber die drei Felder gehören zum Betrieb. Der Mais steht kurz vor der Ernte.', needs: 'eigene_felder' },
-  { id: 'schwieriger_standort', title: 'Schwieriger Standort', text: 'Weniger Tierhaltung in der Nähe, längere Wege für Gülle, und das Dorf liegt direkt an der Zufahrt.', needs: 'schwieriger_standort' },
+  { id: 'altanlage', title: 'Altanlage', text: `Ein BHKW mit ${PS.altanlage.chpKwEl} Kilowatt macht aus dem Gas Strom nach EEG. Der Vorbesitzer hat sich zur Ruhe gesetzt; die Anlage läuft, ist aber in die Jahre gekommen. Seine Felder sind noch bis Mitte Oktober verpachtet.` },
+  { id: 'eigene_felder', title: 'Biomethananlage mit eigenen Feldern', text: `Etwa ${times(PS.eigene_felder.scale)} so groß. Statt eines BHKW bereitet eine Gasaufbereitung das Biogas zu Biomethan auf und speist es ins Erdgasnetz ein; den Fermenter heizt ein Gaskessel. Die drei Felder gehören zum Betrieb, der Mais steht kurz vor der Ernte.`, needs: 'eigene_felder' },
+  { id: 'schwieriger_standort', title: 'Verbundanlage am schwierigen Standort', text: `Die größte Anlage, etwa ${times(PS.schwieriger_standort.scale)} so groß. Ein BHKW mit ${PS.schwieriger_standort.chpKwEl} Kilowatt verstromt einen Teil des Gases, der Rest geht als Biomethan ins Erdgasnetz. Weniger Tierhaltung in der Nähe, längere Wege für Gülle, und das Dorf liegt direkt an der Zufahrt.`, needs: 'schwieriger_standort' },
 ];
 
 const LEVELS: { id: NonNullable<ScenarioOptions['difficulty']>; title: string; text: string; tip: string }[] = [
@@ -178,7 +187,7 @@ export function buildMenu(o: MenuOptions): HTMLElement {
     h('header', { class: 'menu__head' },
       h('p', { class: 'eyebrow' }, 'Ein Jahr auf der Biogasanlage'),
       h('h2', { id: 'end-title' }, 'Biogas-Anlage'),
-      h('p', { class: 'analysis__sentence' }, 'Am 1. August übernehmen Sie eine Biogasanlage mit 500 Kilowatt. Bis zum 31. Juli führen Sie den Betrieb.'),
+      h('p', { class: 'analysis__sentence' }, 'Am 1. August übernehmen Sie eine Biogasanlage. Bis zum 31. Juli führen Sie den Betrieb.'),
       nameField,
       start,
     ),

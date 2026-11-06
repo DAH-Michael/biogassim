@@ -88,6 +88,7 @@ function printSingle(g: GameState): void {
 
   console.log('\nKennzahlen:');
   console.log(`  Strom erzeugt         ${num(y.kwhEl / 1000)} MWh`);
+  console.log(`  Biomethan eingespeist ${num(y.kwhGas / 1000)} MWh`);
   console.log(`  Gewinn                ${eur(y.profitEur)} (Kontostand ${eur(y.balanceEur)})`);
   console.log(`  Akzeptanz             ${num(y.acceptance)} (Mittel ${num(y.acceptanceAvg)})`);
   console.log(`  Gasverluste           ${num(y.gasLossShare * 100, 1)} % (Fackel ${num(y.flaredM3)} m³ Biogas, Lager ${num(y.ch4LostStorageM3)} m³ CH4)`);

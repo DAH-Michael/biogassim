@@ -14,6 +14,7 @@ import { h, svg } from './dom';
 import { ICONS } from './icons';
 import { Advisor } from './advisor';
 import { buildStats } from './stats';
+import { hasChp, plantScale } from '../sim/plant';
 import logoUrl from '../assets/logos/dah-logo-horizontal-farbig.svg?url';
 import { TIPS } from '../content/tooltips.de';
 
@@ -24,7 +25,7 @@ import { TIPS } from '../content/tooltips.de';
 const SEASONS: Record<number, string> = { 12: 'Winter', 1: 'Winter', 2: 'Winter', 3: 'Frühjahr', 4: 'Frühjahr', 5: 'Frühjahr', 6: 'Sommer', 7: 'Sommer', 8: 'Sommer', 9: 'Herbst', 10: 'Herbst', 11: 'Herbst' };
 
 /** Antippbare Bereiche der Szene (Weltkoordinaten), der zugehörige Entscheidungsbereich und die Hervorhebung. */
-interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean; shape: HoverShape }
+interface Hit { panel: string; label: string; test: (x: number, y: number) => boolean; shape: HoverShape; when?: (s: GameState) => boolean }
 const circle = (panel: string, name: string, cx: number, cy: number, r: number, h: number, pad = 0): Hit => ({
   panel, label: name, test: (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= (r + pad) ** 2, shape: { kind: 'circle', cx, cy, r, h, label: name },
 });
@@ -32,13 +33,18 @@ const rect = (panel: string, name: string, rx: number, ry: number, w: number, d:
   panel, label: name, test: (x, y) => x >= rx && x <= rx + w && y >= ry && y <= ry + d, shape: { kind: 'rect', x: rx, y: ry, w, d, h, label: name },
 });
 const P = PLANT;
+const only = (h: Hit, when: (s: GameState) => boolean): Hit => ({ ...h, when });
 const HITS: Hit[] = [
+  only(rect('tech', 'Gasaufbereitung, öffnet Technik', P.upgrading.x, P.upgrading.y - 0.6, P.upgrading.w, P.upgrading.d + 0.6, P.upgrading.h + 0.9), (s) => !!s.upgrading),
+  only(rect('tech', 'Einspeisestation ins Erdgasnetz, öffnet Technik', P.injection.x, P.injection.y, P.injection.w, P.injection.d, P.injection.h), (s) => !!s.upgrading),
+  only(circle('feed', 'Zweiter Fermenter, öffnet Fütterung', P.fermenter2.cx, P.fermenter2.cy, P.fermenter2.r, P.fermenter2.h), (s) => plantScale(s) > 1),
+  only(circle('feed', 'Zweiter Nachgärer, öffnet Fütterung', P.post2.cx, P.post2.cy, P.post2.r, P.post2.h + P.post2.r * 0.6), (s) => plantScale(s) > 2),
   circle('feed', 'Fermenter, öffnet Fütterung', P.fermenter.cx, P.fermenter.cy, P.fermenter.r, P.fermenter.h),
   circle('feed', 'Nachgärer mit Gasspeicher, öffnet Fütterung', P.post.cx, P.post.cy, P.post.r, P.post.h + P.post.r * 0.6),
   rect('feed', 'Feststoffeintrag, öffnet Fütterung', P.feeder.x, P.feeder.y, P.feeder.w, P.feeder.d, P.feeder.h),
   circle('feed', 'Vorgrube für Gülle, öffnet Fütterung', P.pit.cx, P.pit.cy, P.pit.r, 0.5, 0.3),
   rect('supply', 'Fahrsilo, öffnet Beschaffung', P.silo.x - 0.3, P.silo.y - 0.3, P.silo.w + 0.6, P.silo.d + 0.3, P.silo.wall),
-  rect('tech', 'BHKW, öffnet Technik', P.chp.x, P.chp.y, P.chp.w, P.chp.d, P.chp.h),
+  only(rect('tech', 'BHKW, öffnet Technik', P.chp.x, P.chp.y, P.chp.w, P.chp.d, P.chp.h), (s) => hasChp(s)),
   circle('tech', 'Entschwefelung, öffnet Technik', P.desulf.cx, P.desulf.cy, P.desulf.r, P.desulf.h, 0.4),
   circle('tech', 'Notfackel, öffnet Technik', P.flare.x, P.flare.y, 0.5, P.flare.h, 0.4),
   circle('dig', 'Gärrestlager, öffnet Gärrest', P.storage.cx, P.storage.cy, P.storage.r, P.storage.h),
@@ -403,7 +409,8 @@ export class App {
     const v = this.scene.currentView;
     for (const z of HIT_HEIGHTS) {
       const [x, y] = unproject(v, sx, sy + z * v.scale);
-      const hit = HITS.find((hh) => hh.test(x, y));
+      const st = this.game.state;
+      const hit = HITS.find((hh) => (!hh.when || hh.when(st)) && hh.test(x, y));
       if (hit && this.panelAvailable(hit.panel)) return hit;
       // Felder ohne eigenen Bereich (Stufe Vereinfacht): dort liefern die Landwirte, also Beschaffung
       if (hit && hit.panel === 'fields') return { ...hit, panel: 'supply', label: 'Feld eines Landwirts, öffnet Beschaffung', shape: { ...hit.shape, label: 'Feld eines Landwirts, öffnet Beschaffung' } };

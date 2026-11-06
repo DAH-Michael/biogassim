@@ -180,3 +180,17 @@ In „Vereinfacht“ ist ein gutes Jahr leicht zu erreichen. Das ist gewollt: Di
 Der Eigenstrombedarf besteht aus einer Grundlast von 15 kW (Rührwerke, Pumpen, Steuerung, Gaskühlung) und 4 % der Erzeugung, bei Volllast zusammen rund 7 %. Deckt die Erzeugung den Eigenbedarf nicht, wird Netzstrom zu 0,25 €/kWh gekauft. Vorher war der Eigenstrom ein fester Anteil der Erzeugung und fiel bei Teillast unrealistisch mit ab.
 
 Prüfung „Silo leer, nichts nachkaufen“ (Altanlage, Normal, Wartung erledigt): Die Gasproduktion fällt nach dem letzten Mais in vier Tagen auf etwa 70 %, nach zwölf Tagen auf etwa 30 % und pendelt sich dann bei rund 15 % ein, getragen nur von der Gülle. Die Abwärme reicht dann im Winter nicht mehr, der Fermenter kühlt von November bis Februar aus und die Biologie kippt Anfang März. Der schnelle Abfall in den ersten zwei Wochen ist fachlich plausibel (leicht abbaubare Silage). Der Nachlauf ist eher etwas zu kurz, weil der Abbau mit nur einer Fraktion je Substrat modelliert ist; eine langsame Faserfraktion würde den Rest über einige Wochen strecken. Offener Punkt: Die Fixkosten von 8.500 € im Monat sind für eine 500-kW-Anlage eher knapp, deshalb verliert der Betrieb im Stillstand vergleichsweise wenig Geld. Richtwert, fachlich prüfen.
+
+## Anlagen der Szenarien
+
+Normal, 8 Seeds, Gewinn bei Erfolg im Mittel:
+
+| Szenario | ausgewogen | standort_angepasst | vorbildlich | naiv |
+|---|---|---|---|---|
+| Altanlage (BHKW, 1-fach) | −13 T€ | +38 T€ | +34 T€ | scheitert |
+| Biomethananlage (Aufbereitung, 1,8-fach) | +85 T€ | +116 T€ | +95 T€ | scheitert |
+| Verbundanlage (BHKW und Aufbereitung, 2,6-fach) | −915 T€ (Maisdeckel) | +340 T€ | −839 T€ (Maisdeckel) | scheitert |
+
+Die Verbundanlage steht am schwierigen Standort mit wenig Gülle. Wer keinen zusätzlichen Güllelieferanten unter Vertrag nimmt, überschreitet den Maisdeckel und verliert dann für Strom und Biomethan den Aufschlag. Das war schon bei der kleinen Anlage so, ist jetzt aber 2,6-fach so teuer. Die Gewinnschwellen der Bewertung wachsen mit der Anlagengröße.
+
+Die größte Kostenposition der Biomethananlage nach dem Substrat ist der Strom für die Aufbereitung (rund 260 T€ im Jahr). Reagiert das Ergebnis empfindlich auf den Biomethanpreis: 1 ct/kWh mehr oder weniger verschiebt den Gewinn um rund 150 T€.

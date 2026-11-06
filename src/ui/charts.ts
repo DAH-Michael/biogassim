@@ -4,6 +4,7 @@ import { mainPath, type SimEvent } from '../sim/eventlog';
 import { describeEvent } from '../content/events.de';
 import type { GameState } from '../sim/types';
 import { fmt, h } from './dom';
+import { cfg, hasChp } from '../sim/plant';
 
 /**
  * Verläufe über das Jahr als kleine Einzeldiagramme mit gemeinsamer Zeitachse.
@@ -38,7 +39,9 @@ interface SeriesDef {
   dots?: (s: GameState) => { day: number; value: number }[];
   dotsLabel?: string;
   lineLabel?: string;
-  ref?: { value: number; label: string };
+  ref?: { value: number | ((s: GameState) => number); label: string };
+  /** Grafik nur für Anlagen mit dieser Technik */
+  available?: (s: GameState) => boolean;
   band?: { from: number; to: number; label: string };
   min?: number;
   /** Mindestspanne der Achse, damit kleine Schwankungen nicht übertrieben wirken */
@@ -57,6 +60,8 @@ const SERIES: SeriesDef[] = [
     lineLabel: 'im Fermenter', dots: (s) => s.measurement.history, dotsLabel: 'Laborwert',
     ref: { value: CONFIG.biology.fosTacWarning, label: 'Warnschwelle' },
   },
+  { id: 'power', title: 'Strom', values: (s) => s.history.powerKwh, format: (v) => `${fmt.int(v)} kWh/Tag`, min: 0, available: (s) => hasChp(s) },
+  { id: 'biomethan', title: 'Biomethan eingespeist', values: (s) => s.history.gasKwh, format: (v) => `${fmt.int(v)} kWh/Tag`, min: 0, available: (s) => !!s.upgrading },
   { id: 'temp', title: 'Fermentertemperatur', values: (s) => s.history.tempC, format: (v) => `${fmt.dec(v, 1)} °C`, minSpan: 15 },
   { id: 'store', title: 'Gasspeicher', values: (s) => s.history.gasStorageShare, format: (v) => fmt.pct(v), min: 0, ref: { value: 1, label: 'voll' } },
   { id: 'silo', title: 'Silovorrat', values: (s) => s.history.siloT, format: (v) => `${fmt.int(v)} t`, min: 0 },
@@ -64,7 +69,7 @@ const SERIES: SeriesDef[] = [
     id: 'dig', title: 'Gärrestlager', values: (s) => s.history.digestateShare, format: (v) => fmt.pct(v), min: 0,
     ref: { value: 1, label: 'voll' }, band: blackoutBand(),
   },
-  { id: 'money', title: 'Kontostand', values: (s) => s.history.balance, format: (v) => fmt.eur(v), ref: { value: -CONFIG.finance.creditLimitEur, label: 'Kreditrahmen' } },
+  { id: 'money', title: 'Kontostand', values: (s) => s.history.balance, format: (v) => fmt.eur(v), ref: { value: (s) => -cfg(s).finance.creditLimitEur, label: 'Kreditrahmen' } },
   { id: 'acc', title: 'Akzeptanz', values: (s) => s.history.acceptance, format: (v) => `${fmt.int(v)} von 100`, min: 0, ref: { value: CONFIG.acceptance.criticalLevel, label: 'kritisch' } },
 ];
 const xOf = (day: number, days: number) => PAD_L + (day / Math.max(1, days - 1)) * (W - PAD_L - PAD_R);
@@ -197,7 +202,9 @@ export function buildTimeline(s: GameState, opts: TimelineOptions = {}): HTMLEle
 
   // Einzeldiagramme
   for (const def0 of SERIES) {
+    if (def0.available && !def0.available(s)) continue;
     const def = opts.live ? liveSeries(def0) : def0;
+    const refValue = def.ref ? (typeof def.ref.value === 'function' ? def.ref.value(s) : def.ref.value) : 0;
     const vals = def.values(s);
     if (!vals.length) continue;
     const dots = def.dots?.(s) ?? [];
@@ -206,8 +213,8 @@ export function buildTimeline(s: GameState, opts: TimelineOptions = {}): HTMLEle
     if (def.min !== undefined) min = Math.min(min, def.min);
     // Grenzwerte liegen immer im sichtbaren Bereich, damit der Abstand dazu lesbar ist
     if (def.ref) {
-      min = Math.min(min, def.ref.value);
-      max = Math.max(max, def.ref.value);
+      min = Math.min(min, refValue);
+      max = Math.max(max, refValue);
     }
     if (def.minSpan && max - min < def.minSpan) min = max - def.minSpan;
     if (max - min < 1e-9) max = min + 1;
@@ -243,7 +250,7 @@ export function buildTimeline(s: GameState, opts: TimelineOptions = {}): HTMLEle
       svgEl.append(ml);
     }
     if (def.ref) {
-      const y = yOf(def.ref.value);
+      const y = yOf(refValue);
       svgEl.append(el('line', { x1: PAD_L, x2: W - PAD_R, y1: y, y2: y, class: 'chart__ref' }));
       const rl = el('text', { x: W - PAD_R - 4, y: y - 4, class: 'chart__ref-label', 'text-anchor': 'end' });
       rl.textContent = def.ref.label;
@@ -297,7 +304,8 @@ function legendShape(kind: 'decision' | 'warning' | 'critical' | 'chain'): SVGEl
 /** Tabellenansicht: Werte am Monatsende. */
 function tableView(s: GameState, live = false): HTMLElement {
   const days = s.history.day.length;
-  const series = live ? SERIES.map(liveSeries) : SERIES;
+  const avail = SERIES.filter((d) => !d.available || d.available(s));
+  const series = live ? avail.map(liveSeries) : avail;
   const rows: HTMLElement[] = [];
   for (let i = 0; i < days; i++) {
     const last = i === days - 1 || dateOfDay(i + 1).month !== dateOfDay(i).month;

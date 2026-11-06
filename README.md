@@ -38,7 +38,7 @@ URL-Parameter für Abnahme und Balancing (sie überspringen das Startmenü, auß
 | `?seed=42` | fester Zufallsstartwert |
 | `?demo=ausgewogen` | ein Testspieler trifft die Entscheidungen |
 | `?tag=120` | springt zu Spieltag 120 |
-| `?szenario=eigene_felder` | Startszenario mit eigenen Feldern |
+| `?szenario=eigene_felder` | Biomethananlage mit eigenen Feldern (`schwieriger_standort`: Verbundanlage) |
 | `?waerme` | Wärmeleitung ab Start |
 | `?schwierigkeit=vereinfacht` oder `real` | Schwierigkeitsgrad (Standard normal) |
 | `?speed=2`, mit `?debug` bis 50 | Geschwindigkeit |
