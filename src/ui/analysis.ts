@@ -92,7 +92,7 @@ function summaryBlock(s: GameState, failed: boolean): HTMLElement {
     ...(s.upgrading ? [['Biomethan eingespeist', `${fmt.int(y.kwhGas / 1000)} MWh`] as [string, string]] : []),
     ['Gewinn', fmt.eur(y.profitEur)],
     ['Akzeptanz im Mittel', `${fmt.int(y.acceptanceAvg)} von 100`],
-    ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} % (Fackel ${fmt.int(y.flaredM3)} m³ Biogas, Lager ${fmt.int(y.ch4LostStorageM3)} m³ Methan)`],
+    ['Gasverluste und Emissionen', `${fmt.dec(y.gasLossShare * 100, 1)} % (Fackel ${fmt.int(y.flaredM3)} m³ Biogas, Lager ${fmt.int(y.ch4LostStorageM3)} m³ Methan${s.upgrading ? `, Schlupf der Aufbereitung ${fmt.int(s.totals.ch4SlipM3)} m³ Methan` : ''})`],
     ['Maisanteil an der Masse', fmt.pct(y.maizeShare)],
     ['Tage mit gestörter Biologie', fmt.pct(y.bioErrorShare)],
   ];
