@@ -205,6 +205,11 @@ export class MetricsBar {
     }
   }
 
+  /** Kennwert hervorheben, dessen Verlauf gerade in der Statistik gezeigt wird */
+  setActive(id: string | null): void {
+    for (const [k, c] of this.cells) c.root.setAttribute('aria-pressed', String(k === id));
+  }
+
   /** aktuelle Warnstufe eines Kennwerts (für Tests und Beraterin) */
   level(id: string): MetricLevel {
     return (this.cells.get(id)?.root.dataset.level as MetricLevel | undefined) ?? 'ok';
